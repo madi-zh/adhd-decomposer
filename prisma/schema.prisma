@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  rawInput    String
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  steps       Step[]
+}
+
+model Step {
+  id          String    @id @default(cuid())
+  taskId      String
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  orderIndex  Int
+  content     String
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+}
