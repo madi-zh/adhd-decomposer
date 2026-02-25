@@ -3,8 +3,20 @@
 import { useEffect } from "react";
 import Link from "next/link";
 
-export default function Celebration({ taskTitle }: { taskTitle: string }) {
+interface CelebrationProps {
+  taskTitle: string;
+  confettiColors?: string[];
+  xpAwarded?: number;
+}
+
+export default function Celebration({
+  taskTitle,
+  confettiColors,
+  xpAwarded,
+}: CelebrationProps) {
   useEffect(() => {
+    const colors = confettiColors ?? ["#f59e0b", "#10b981", "#6366f1"];
+
     import("canvas-confetti").then((mod) => {
       const confetti = mod.default;
       const duration = 3000;
@@ -16,14 +28,14 @@ export default function Celebration({ taskTitle }: { taskTitle: string }) {
           angle: 60,
           spread: 55,
           origin: { x: 0, y: 0.7 },
-          colors: ["#f59e0b", "#10b981", "#6366f1"],
+          colors,
         });
         confetti({
           particleCount: 3,
           angle: 120,
           spread: 55,
           origin: { x: 1, y: 0.7 },
-          colors: ["#f59e0b", "#10b981", "#6366f1"],
+          colors,
         });
 
         if (Date.now() < end) {
@@ -33,7 +45,7 @@ export default function Celebration({ taskTitle }: { taskTitle: string }) {
 
       frame();
     });
-  }, []);
+  }, [confettiColors]);
 
   return (
     <div className="flex flex-col items-center justify-center pt-16 text-center">
@@ -42,7 +54,13 @@ export default function Celebration({ taskTitle }: { taskTitle: string }) {
       <p className="text-lg text-stone-500 mb-2">
         You finished every single step.
       </p>
-      <p className="text-stone-400 mb-10">&ldquo;{taskTitle}&rdquo;</p>
+      <p className="text-stone-400 mb-4">&ldquo;{taskTitle}&rdquo;</p>
+
+      {xpAwarded !== undefined && xpAwarded > 0 && (
+        <p className="text-amber-600 font-bold text-lg bg-amber-50 rounded-full px-4 py-1 mb-6">
+          +{xpAwarded} XP
+        </p>
+      )}
 
       <Link
         href="/"
