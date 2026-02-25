@@ -1,9 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import TaskHistoryCard from "@/components/TaskHistoryCard";
 
 export default async function HistoryPage() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
   const tasks = await prisma.task.findMany({
+    where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

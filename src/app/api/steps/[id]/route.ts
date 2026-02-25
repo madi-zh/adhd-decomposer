@@ -1,14 +1,28 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 
 export async function PATCH(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
+    const [session, { id }] = await Promise.all([auth(), params]);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const step = await prisma.step.update({
+    // Verify ownership through the parent task
+    const step = await prisma.step.findUnique({
+      where: { id },
+      include: { task: { select: { userId: true } } },
+    });
+
+    if (!step || step.task.userId !== session.user.id) {
+      return NextResponse.json({ error: "Step not found" }, { status: 404 });
+    }
+
+    const updatedStep = await prisma.step.update({
       where: { id },
       data: {
         isCompleted: true,
@@ -20,14 +34,14 @@ export async function PATCH(
     after(async () => {
       const remainingSteps = await prisma.step.count({
         where: {
-          taskId: step.taskId,
+          taskId: updatedStep.taskId,
           isCompleted: false,
         },
       });
 
       if (remainingSteps === 0) {
         await prisma.task.update({
-          where: { id: step.taskId },
+          where: { id: updatedStep.taskId },
           data: {
             status: "completed",
             completedAt: new Date(),
@@ -36,7 +50,7 @@ export async function PATCH(
       }
     });
 
-    return NextResponse.json({ step });
+    return NextResponse.json({ step: updatedStep });
   } catch {
     return NextResponse.json(
       { error: "Failed to update step." },
