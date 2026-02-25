@@ -28,9 +28,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
-    });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const [existingUser, hashedPassword] = await Promise.all([
+      prisma.user.findUnique({ where: { email: normalizedEmail } }),
+      bcrypt.hash(password, 12),
+    ]);
 
     if (existingUser) {
       return NextResponse.json(
@@ -39,12 +42,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
-
     await prisma.user.create({
       data: {
         name: name?.trim() || null,
-        email: email.toLowerCase().trim(),
+        email: normalizedEmail,
         hashedPassword,
       },
     });

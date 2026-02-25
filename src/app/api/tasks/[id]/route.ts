@@ -7,23 +7,17 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const [session, { id }] = await Promise.all([auth(), params]);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
-
     const task = await prisma.task.findUnique({
-      where: { id },
+      where: { id, userId: session.user.id },
       include: { steps: { orderBy: { orderIndex: "asc" } } },
     });
 
     if (!task) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
-    }
-
-    if (task.userId !== session.user.id) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 

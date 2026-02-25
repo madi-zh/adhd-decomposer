@@ -12,14 +12,11 @@ const Celebration = dynamic(() => import("@/components/Celebration"), {
 interface Step {
   id: string;
   content: string;
-  orderIndex: number;
   isCompleted: boolean;
 }
 
 interface Task {
-  id: string;
   title: string;
-  status: string;
   steps: Step[];
 }
 

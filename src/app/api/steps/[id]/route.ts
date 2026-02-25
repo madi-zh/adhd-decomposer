@@ -7,12 +7,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await auth();
+    const [session, { id }] = await Promise.all([auth(), params]);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const { id } = await params;
 
     // Verify ownership through the parent task
     const step = await prisma.step.findUnique({

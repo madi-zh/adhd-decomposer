@@ -96,7 +96,7 @@ export default function TaskInput() {
       </form>
 
       <p className="text-stone-400 text-xs mt-6 text-center">
-        No signup needed. Your tasks are stored locally.
+        Your tasks are saved to your account.
       </p>
     </div>
   );

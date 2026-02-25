@@ -5,12 +5,15 @@ import { auth } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
-    const session = await auth();
+    const [session, body] = await Promise.all([
+      auth(),
+      request.json().catch(() => null),
+    ]);
+
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json(
         { error: "Invalid request body." },
@@ -37,7 +40,7 @@ export async function POST(request: Request) {
         rawInput: trimmed,
         userId: session.user.id,
         steps: {
-          create: result.steps.map((content: string, index: number) => ({
+          create: result.steps.map((content, index) => ({
             content,
             orderIndex: index,
           })),
@@ -70,7 +73,6 @@ export async function GET() {
         title: true,
         status: true,
         completedAt: true,
-        createdAt: true,
         _count: { select: { steps: true } },
       },
     });

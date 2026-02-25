@@ -1,11 +1,6 @@
 "use client";
 
-export default function Error({
-  reset,
-}: {
-  error: Error & { digest?: string };
-  reset: () => void;
-}) {
+export default function Error({ reset }: { reset: () => void }) {
   return (
     <div className="flex flex-col items-center pt-24 text-center">
       <h2 className="text-xl font-semibold text-stone-700 mb-2">
