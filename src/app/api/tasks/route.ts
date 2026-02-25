@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { decomposeTask } from "@/lib/claude";
+import { auth } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await request.json().catch(() => null);
     if (!body) {
       return NextResponse.json(
@@ -29,6 +35,7 @@ export async function POST(request: Request) {
       data: {
         title: result.title,
         rawInput: trimmed,
+        userId: session.user.id,
         steps: {
           create: result.steps.map((content: string, index: number) => ({
             content,
@@ -50,7 +57,13 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const tasks = await prisma.task.findMany({
+      where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

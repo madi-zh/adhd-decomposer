@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/lib/auth";
 import TaskStepController from "@/components/TaskStepController";
 
 export default async function TaskPage({
@@ -7,6 +8,11 @@ export default async function TaskPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
   const { id } = await params;
 
   const task = await prisma.task.findUnique({
@@ -14,7 +20,7 @@ export default async function TaskPage({
     include: { steps: { orderBy: { orderIndex: "asc" } } },
   });
 
-  if (!task) {
+  if (!task || task.userId !== session.user.id) {
     notFound();
   }
 
