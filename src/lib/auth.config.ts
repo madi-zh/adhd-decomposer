@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
@@ -7,6 +8,7 @@ export const authConfig: NextAuthConfig = {
     signIn: "/login",
   },
   providers: [
+    Google,
     Credentials({
       credentials: {
         email: { type: "email" },
@@ -22,7 +24,9 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const isAuthPage =
         request.nextUrl.pathname.startsWith("/login") ||
-        request.nextUrl.pathname.startsWith("/register");
+        request.nextUrl.pathname.startsWith("/register") ||
+        request.nextUrl.pathname.startsWith("/forgot-password") ||
+        request.nextUrl.pathname.startsWith("/reset-password");
 
       if (isAuthPage) return true;
       return isLoggedIn;
