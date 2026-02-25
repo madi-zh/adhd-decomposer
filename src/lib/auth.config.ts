@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: "jwt" },
@@ -7,6 +8,7 @@ export const authConfig: NextAuthConfig = {
     signIn: "/login",
   },
   providers: [
+    Google,
     Credentials({
       credentials: {
         email: { type: "email" },
@@ -20,11 +22,15 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
-      const isAuthPage =
-        request.nextUrl.pathname.startsWith("/login") ||
-        request.nextUrl.pathname.startsWith("/register");
+      const authPrefixes = ["/login", "/register", "/forgot-password", "/reset-password"];
+      const isAuthPage = authPrefixes.some((p) => request.nextUrl.pathname.startsWith(p));
 
-      if (isAuthPage) return true;
+      if (isAuthPage) {
+        if (isLoggedIn) {
+          return Response.redirect(new URL("/", request.nextUrl));
+        }
+        return true;
+      }
       return isLoggedIn;
     },
     jwt({ token, user }) {
