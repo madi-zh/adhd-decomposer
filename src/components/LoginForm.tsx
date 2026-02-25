@@ -2,11 +2,12 @@
 
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,9 +28,10 @@ export default function LoginForm() {
       if (result?.error) {
         setError("Invalid email or password.");
       } else {
-        const callbackUrl =
-          new URLSearchParams(window.location.search).get("callbackUrl") || "/";
-        router.push(callbackUrl);
+        const callbackUrl = searchParams.get("callbackUrl") || "/";
+        // Prevent open-redirect: only allow relative paths
+        const safeUrl = callbackUrl.startsWith("/") && !callbackUrl.startsWith("//") ? callbackUrl : "/";
+        router.push(safeUrl);
         router.refresh();
       }
     } catch {
@@ -39,9 +41,7 @@ export default function LoginForm() {
     }
   }
 
-  const resetSuccess =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("reset") === "success";
+  const resetSuccess = searchParams.get("reset") === "success";
 
   return (
     <div className="flex flex-col items-center pt-12">

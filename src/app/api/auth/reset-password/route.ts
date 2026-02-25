@@ -24,24 +24,24 @@ export async function POST(request: Request) {
     const normalizedEmail = email.toLowerCase().trim();
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    // Look up the token
-    const verificationToken = await prisma.verificationToken.findFirst({
-      where: {
-        identifier: normalizedEmail,
-        token: hashedToken,
-      },
-    });
+    // Hash new password before the transaction to avoid holding the lock during bcrypt
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    if (!verificationToken) {
-      return NextResponse.json(
-        { error: "Invalid or expired reset link" },
-        { status: 400 }
-      );
-    }
+    // Use a transaction to atomically validate the token and update the password
+    const result = await prisma.$transaction(async (tx) => {
+      const verificationToken = await tx.verificationToken.findFirst({
+        where: {
+          identifier: normalizedEmail,
+          token: hashedToken,
+        },
+      });
 
-    // Check expiry
-    if (verificationToken.expires < new Date()) {
-      await prisma.verificationToken.delete({
+      if (!verificationToken) {
+        return { error: "Invalid or expired reset link" } as const;
+      }
+
+      // Delete the token immediately to prevent reuse
+      await tx.verificationToken.delete({
         where: {
           identifier_token: {
             identifier: normalizedEmail,
@@ -49,28 +49,25 @@ export async function POST(request: Request) {
           },
         },
       });
+
+      if (verificationToken.expires < new Date()) {
+        return { error: "Reset link has expired. Please request a new one." } as const;
+      }
+
+      await tx.user.update({
+        where: { email: normalizedEmail },
+        data: { hashedPassword },
+      });
+
+      return { success: true } as const;
+    });
+
+    if ("error" in result) {
       return NextResponse.json(
-        { error: "Reset link has expired. Please request a new one." },
+        { error: result.error },
         { status: 400 }
       );
     }
-
-    // Hash new password and update user
-    const hashedPassword = await bcrypt.hash(password, 12);
-    await prisma.user.update({
-      where: { email: normalizedEmail },
-      data: { hashedPassword },
-    });
-
-    // Delete the used token
-    await prisma.verificationToken.delete({
-      where: {
-        identifier_token: {
-          identifier: normalizedEmail,
-          token: hashedToken,
-        },
-      },
-    });
 
     return NextResponse.json({ success: true });
   } catch {
