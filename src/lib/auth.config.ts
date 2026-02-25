@@ -28,7 +28,12 @@ export const authConfig: NextAuthConfig = {
         request.nextUrl.pathname.startsWith("/forgot-password") ||
         request.nextUrl.pathname.startsWith("/reset-password");
 
-      if (isAuthPage) return true;
+      if (isAuthPage) {
+        if (isLoggedIn) {
+          return Response.redirect(new URL("/", request.nextUrl));
+        }
+        return true;
+      }
       return isLoggedIn;
     },
     jwt({ token, user }) {
