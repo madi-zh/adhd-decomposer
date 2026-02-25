@@ -3,7 +3,21 @@
 import { useEffect } from "react";
 import Link from "next/link";
 
-export default function Celebration({ taskTitle }: { taskTitle: string }) {
+const MOOD_EMOJIS: Record<string, string> = {
+  calm: "\u{1F60C}",
+  excited: "\u2728",
+  anxious: "\u{1F630}",
+  frustrated: "\u{1F624}",
+  tired: "\u{1F971}",
+};
+
+interface CelebrationProps {
+  taskTitle: string;
+  moodBefore?: string | null;
+  moodAfter?: string | null;
+}
+
+export default function Celebration({ taskTitle, moodBefore, moodAfter }: CelebrationProps) {
   useEffect(() => {
     import("canvas-confetti").then((mod) => {
       const confetti = mod.default;
@@ -43,6 +57,14 @@ export default function Celebration({ taskTitle }: { taskTitle: string }) {
         You finished every single step.
       </p>
       <p className="text-stone-400 mb-10">&ldquo;{taskTitle}&rdquo;</p>
+
+      {moodBefore && moodAfter && (
+        <div className="flex items-center gap-2 bg-stone-50 rounded-full px-4 py-2 mb-6">
+          <span>{MOOD_EMOJIS[moodBefore] ?? moodBefore}</span>
+          <span className="text-stone-300">&rarr;</span>
+          <span>{MOOD_EMOJIS[moodAfter] ?? moodAfter}</span>
+        </div>
+      )}
 
       <Link
         href="/"

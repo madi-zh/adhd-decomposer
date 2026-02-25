@@ -23,7 +23,12 @@ export default async function TaskPage({
   const [task, focusCount] = await Promise.all([
     prisma.task.findUnique({
       where: { id, userId: session.user.id },
-      include: { steps: { orderBy: { orderIndex: "asc" } } },
+      include: {
+        steps: { orderBy: { orderIndex: "asc" } },
+        moodCheckIns: {
+          select: { mood: true, timing: true },
+        },
+      },
     }),
     getActiveFocusCount(),
   ]);
@@ -35,11 +40,16 @@ export default async function TaskPage({
   return (
     <TaskStepController
       task={{
+        id: task.id,
         title: task.title,
         steps: task.steps.map((s) => ({
           id: s.id,
           content: s.content,
           isCompleted: s.isCompleted,
+        })),
+        moodCheckIns: task.moodCheckIns.map((m) => ({
+          mood: m.mood,
+          timing: m.timing,
         })),
       }}
       initialFocusCount={focusCount}
