@@ -22,11 +22,8 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const isLoggedIn = !!auth?.user;
-      const isAuthPage =
-        request.nextUrl.pathname.startsWith("/login") ||
-        request.nextUrl.pathname.startsWith("/register") ||
-        request.nextUrl.pathname.startsWith("/forgot-password") ||
-        request.nextUrl.pathname.startsWith("/reset-password");
+      const authPrefixes = ["/login", "/register", "/forgot-password", "/reset-password"];
+      const isAuthPage = authPrefixes.some((p) => request.nextUrl.pathname.startsWith(p));
 
       if (isAuthPage) {
         if (isLoggedIn) {

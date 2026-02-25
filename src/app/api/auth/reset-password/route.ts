@@ -1,22 +1,27 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
     const { email, token, password } = await request.json();
 
-    if (!email || !token || !password) {
+    if (
+      !email || typeof email !== "string" ||
+      !token || typeof token !== "string" ||
+      !password || typeof password !== "string"
+    ) {
       return NextResponse.json(
         { error: "Email, token, and password are required" },
         { status: 400 }
       );
     }
 
-    if (password.length < 8) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters" },
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` },
         { status: 400 }
       );
     }
@@ -24,8 +29,8 @@ export async function POST(request: Request) {
     const normalizedEmail = email.toLowerCase().trim();
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    // Hash new password before the transaction to avoid holding the lock during bcrypt
-    const hashedPassword = await bcrypt.hash(password, 12);
+    // Start bcrypt early, await inside transaction after token lookup
+    const hashedPasswordPromise = bcrypt.hash(password, 12);
 
     // Use a transaction to atomically validate the token and update the password
     const result = await prisma.$transaction(async (tx) => {
@@ -40,7 +45,20 @@ export async function POST(request: Request) {
         return { error: "Invalid or expired reset link" } as const;
       }
 
-      // Delete the token immediately to prevent reuse
+      // Check expiry before deleting so error messages stay consistent
+      if (verificationToken.expires < new Date()) {
+        await tx.verificationToken.delete({
+          where: {
+            identifier_token: {
+              identifier: normalizedEmail,
+              token: hashedToken,
+            },
+          },
+        });
+        return { error: "Reset link has expired. Please request a new one." } as const;
+      }
+
+      // Delete the token to prevent reuse
       await tx.verificationToken.delete({
         where: {
           identifier_token: {
@@ -50,10 +68,7 @@ export async function POST(request: Request) {
         },
       });
 
-      if (verificationToken.expires < new Date()) {
-        return { error: "Reset link has expired. Please request a new one." } as const;
-      }
-
+      const hashedPassword = await hashedPasswordPromise;
       await tx.user.update({
         where: { email: normalizedEmail },
         data: { hashedPassword },

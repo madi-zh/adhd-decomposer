@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import ErrorAlert from "@/components/ErrorAlert";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -65,14 +66,7 @@ export default function ForgotPasswordPage() {
       </p>
 
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        {error && (
-          <div
-            role="alert"
-            className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"
-          >
-            {error}
-          </div>
-        )}
+        {error && <ErrorAlert message={error} />}
 
         <div>
           <label

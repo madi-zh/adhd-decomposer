@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 
 export async function POST(request: Request) {
   try {
@@ -39,8 +39,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send email with the unhashed token
-    await sendPasswordResetEmail(normalizedEmail, token);
+    // Send email after response is returned (non-blocking)
+    after(async () => {
+      await sendPasswordResetEmail(normalizedEmail, token);
+    });
 
     return NextResponse.json({ success: true });
   } catch {

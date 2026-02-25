@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useState, Suspense } from "react";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import ErrorAlert from "@/components/ErrorAlert";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -43,8 +45,8 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
 
@@ -80,14 +82,7 @@ function ResetPasswordForm() {
       <p className="text-stone-500 mb-8">Enter your new password below</p>
 
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        {error && (
-          <div
-            role="alert"
-            className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"
-          >
-            {error}
-          </div>
-        )}
+        {error && <ErrorAlert message={error} />}
 
         <div>
           <label
@@ -104,7 +99,7 @@ function ResetPasswordForm() {
             required
             autoComplete="new-password"
             className="w-full rounded-lg border border-stone-300 px-3 py-2 text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-            placeholder="At least 8 characters"
+            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
           />
         </div>
 
@@ -150,7 +145,7 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="flex justify-center pt-12">Loading...</div>}>
       <ResetPasswordForm />
     </Suspense>
   );
