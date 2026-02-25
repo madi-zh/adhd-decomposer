@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import localFont from "next/font/local";
 import Providers from "@/components/Providers";
 import NavBar from "@/components/NavBar";
 import "./globals.css";
 
-const geistSans = Geist({
+const geistSans = localFont({
+  src: "../../node_modules/next/dist/next-devtools/server/font/geist-latin.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {

@@ -56,15 +56,27 @@ model VerificationToken {
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  title       String
-  rawInput    String
-  status      String    @default("active")
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps       Step[]
+  id           String        @id @default(cuid())
+  title        String
+  rawInput     String
+  status       String        @default("active")
+  createdAt    DateTime      @default(now())
+  completedAt  DateTime?
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps        Step[]
+  timeEstimate TimeEstimate?
+}
+
+model TimeEstimate {
+  id              String    @id @default(cuid())
+  taskId          String    @unique
+  task            Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  estimateMinutes Int
+  startedAt       DateTime
+  completedAt     DateTime?
+  actualMinutes   Int?
+  createdAt       DateTime  @default(now())
 }
 
 model Step {

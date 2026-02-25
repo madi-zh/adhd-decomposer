@@ -2,8 +2,20 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import TimeComparison from "@/components/TimeComparison";
 
-export default function Celebration({ taskTitle }: { taskTitle: string }) {
+interface CelebrationProps {
+  taskTitle: string;
+  timeEstimate?: {
+    estimateMinutes: number;
+    actualMinutes: number;
+  } | null;
+}
+
+export default function Celebration({
+  taskTitle,
+  timeEstimate,
+}: CelebrationProps) {
   useEffect(() => {
     import("canvas-confetti").then((mod) => {
       const confetti = mod.default;
@@ -43,6 +55,13 @@ export default function Celebration({ taskTitle }: { taskTitle: string }) {
         You finished every single step.
       </p>
       <p className="text-stone-400 mb-10">&ldquo;{taskTitle}&rdquo;</p>
+
+      {timeEstimate ? (
+        <TimeComparison
+          estimateMinutes={timeEstimate.estimateMinutes}
+          actualMinutes={timeEstimate.actualMinutes}
+        />
+      ) : null}
 
       <Link
         href="/"
