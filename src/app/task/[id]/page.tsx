@@ -13,10 +13,28 @@ export default async function TaskPage({
     redirect("/login");
   }
 
-  const task = await prisma.task.findUnique({
-    where: { id, userId: session.user.id },
-    include: { steps: { orderBy: { orderIndex: "asc" } } },
-  });
+  const [task, userSettings, activeFocusSession] = await Promise.all([
+    prisma.task.findUnique({
+      where: { id, userId: session.user.id },
+      include: { steps: { orderBy: { orderIndex: "asc" } } },
+    }),
+    prisma.userSettings.upsert({
+      where: { userId: session.user.id },
+      update: {},
+      create: { userId: session.user.id },
+      select: {
+        eveningCutoffHour: true,
+        eveningCutoffMin: true,
+        enableEveningMode: true,
+        enableFocusTimer: true,
+      },
+    }),
+    prisma.focusSession.findFirst({
+      where: { taskId: id, userId: session.user.id, endedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, timeLimitMin: true, startedAt: true },
+    }),
+  ]);
 
   if (!task) {
     notFound();
@@ -25,6 +43,7 @@ export default async function TaskPage({
   return (
     <TaskStepController
       task={{
+        id: task.id,
         title: task.title,
         steps: task.steps.map((s) => ({
           id: s.id,
@@ -32,6 +51,16 @@ export default async function TaskPage({
           isCompleted: s.isCompleted,
         })),
       }}
+      userSettings={userSettings}
+      focusSession={
+        activeFocusSession
+          ? {
+              id: activeFocusSession.id,
+              timeLimitMin: activeFocusSession.timeLimitMin,
+              startedAt: activeFocusSession.startedAt.toISOString(),
+            }
+          : null
+      }
     />
   );
 }

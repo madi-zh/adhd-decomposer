@@ -19,6 +19,8 @@ model User {
   accounts       Account[]
   sessions       Session[]
   tasks          Task[]
+  focusSessions  FocusSession[]
+  settings       UserSettings?
 }
 
 model Account {
@@ -64,7 +66,8 @@ model Task {
   completedAt DateTime?
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps       Step[]
+  steps         Step[]
+  focusSessions FocusSession[]
 }
 
 model Step {
@@ -75,4 +78,31 @@ model Step {
   content     String
   isCompleted Boolean   @default(false)
   completedAt DateTime?
+}
+
+model FocusSession {
+  id           String    @id @default(cuid())
+  taskId       String
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timeLimitMin Int
+  startedAt    DateTime
+  endedAt      DateTime?
+  nudgeCount   Int       @default(0)
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([taskId])
+}
+
+model UserSettings {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eveningCutoffHour Int      @default(23)
+  eveningCutoffMin  Int      @default(0)
+  enableEveningMode Boolean  @default(false)
+  enableFocusTimer  Boolean  @default(true)
+  updatedAt         DateTime @updatedAt
 }
