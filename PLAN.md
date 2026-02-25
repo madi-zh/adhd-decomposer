@@ -1,320 +1,199 @@
-# Plan: Add Login/Register Functionality
+# Plan: Add Forgot Password & Google SSO
 
 ## Summary
 
-Add NextAuth.js (Auth.js v5) authentication with email/password credentials to the ADHD Decomposer app. All routes will require login. Tasks will be private and scoped to the authenticated user. Existing tasks will be deleted (clean migration).
-
-## Decisions
-
-| Decision | Choice |
-|----------|--------|
-| Auth library | NextAuth.js v5 (Auth.js) |
-| Auth method | Email/password (Credentials provider) |
-| Task privacy | Private only — tasks belong to the logged-in user |
-| Guest access | None — login required for all features |
-| Existing data | Delete all existing tasks (clean slate) |
+Add two auth features to the existing NextAuth.js v5 setup:
+1. **Forgot password flow** — user requests a reset link via email, clicks it to set a new password
+2. **Google OAuth sign-in** — sign in / register with a Google account alongside existing credentials
 
 ---
 
-## Step-by-Step Implementation
+## Feature 1: Forgot Password Flow
 
-### Step 1: Install Dependencies
+### Design Decisions
+
+| Decision | Choice |
+|----------|--------|
+| Token storage | Use existing `VerificationToken` model (already in schema) |
+| Token format | Cryptographically random 64-char hex string via `crypto.randomBytes` |
+| Token expiry | 1 hour |
+| Email delivery | Resend (`resend.com`) via `resend` SDK |
+| Password validation | Same rules as registration (8+ characters) |
+
+### Steps
+
+#### 1.1 Install `resend`
 
 ```bash
-npm install next-auth@beta @auth/prisma-adapter bcryptjs
-npm install -D @types/bcryptjs
+npm install resend
 ```
 
-- `next-auth@beta` — Auth.js v5 for Next.js 16
-- `@auth/prisma-adapter` — Prisma adapter for Auth.js (manages User, Account, Session tables)
-- `bcryptjs` — Password hashing (pure JS, no native deps)
-- `@types/bcryptjs` — TypeScript types
+#### 1.2 Create email utility — `src/lib/email.ts`
 
-### Step 2: Update Prisma Schema
+A helper to send emails via the Resend API. Reads config from env vars:
+- `RESEND_API_KEY` — API key from resend.com dashboard
+- `EMAIL_FROM` — verified sender address (e.g. `noreply@yourdomain.com`)
 
-**File: `prisma/schema.prisma`**
-
-Add Auth.js-required models and link tasks to users:
-
-```prisma
-model User {
-  id             String    @id @default(cuid())
-  name           String?
-  email          String    @unique
-  emailVerified  DateTime?
-  hashedPassword String?
-  image          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  accounts       Account[]
-  sessions       Session[]
-  tasks          Task[]
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-```
-
-Update `Task` model to add user association:
-
-```prisma
-model Task {
-  id          String    @id @default(cuid())
-  title       String
-  rawInput    String
-  status      String    @default("active")
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps       Step[]
-}
-```
-
-Run migration:
-```bash
-npx prisma db push --force-reset
-```
-
-This will reset the database (deleting all existing data) and apply the new schema.
-
-### Step 3: Add Auth.js Configuration
-
-**New file: `src/lib/auth.ts`**
-
-Central Auth.js configuration:
+Exports a `sendPasswordResetEmail(email, token)` function that sends a link to `/reset-password?token=<token>&email=<email>`.
 
 ```typescript
-import NextAuth from "next-auth"
-import Credentials from "next-auth/providers/credentials"
-import { PrismaAdapter } from "@auth/prisma-adapter"
-import bcrypt from "bcryptjs"
-import { prisma } from "./prisma"
+import { Resend } from "resend";
 
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-  },
-  providers: [
-    Credentials({
-      credentials: {
-        email: { type: "email" },
-        password: { type: "password" },
-      },
-      authorize: async (credentials) => {
-        const email = credentials.email as string
-        const password = credentials.password as string
-        if (!email || !password) return null
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-        const user = await prisma.user.findUnique({ where: { email } })
-        if (!user || !user.hashedPassword) return null
+export async function sendPasswordResetEmail(email: string, token: string) {
+  const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
-        const isValid = await bcrypt.compare(password, user.hashedPassword)
-        if (!isValid) return null
-
-        return { id: user.id, name: user.name, email: user.email }
-      },
-    }),
-  ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) token.id = user.id
-      return token
-    },
-    session({ session, token }) {
-      if (session.user) session.user.id = token.id as string
-      return session
-    },
-  },
-})
-```
-
-Key design decisions:
-- **JWT session strategy** — required when using Credentials provider (database sessions don't work with Credentials)
-- **Custom sign-in page** at `/login`
-- **Callbacks** to include `user.id` in the session (not included by default)
-
-### Step 4: Create Auth API Route
-
-**New file: `src/app/api/auth/[...nextauth]/route.ts`**
-
-```typescript
-import { handlers } from "@/lib/auth"
-export const { GET, POST } = handlers
-```
-
-This sets up the NextAuth.js API endpoints at `/api/auth/*` (sign-in, sign-out, session, CSRF, etc.).
-
-### Step 5: Create Registration API Route
-
-**New file: `src/app/api/auth/register/route.ts`**
-
-```typescript
-import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
-import { NextResponse } from "next/server"
-
-export async function POST(request: Request) {
-  const { name, email, password } = await request.json()
-
-  // Validate input
-  if (!email || !password) {
-    return NextResponse.json({ error: "Email and password are required" }, { status: 400 })
-  }
-  if (password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 })
-  }
-
-  // Check for existing user
-  const existingUser = await prisma.user.findUnique({ where: { email } })
-  if (existingUser) {
-    return NextResponse.json({ error: "Email already registered" }, { status: 409 })
-  }
-
-  // Hash password and create user
-  const hashedPassword = await bcrypt.hash(password, 12)
-  await prisma.user.create({
-    data: { name, email, hashedPassword },
-  })
-
-  return NextResponse.json({ success: true }, { status: 201 })
+  await resend.emails.send({
+    from: process.env.EMAIL_FROM!,
+    to: email,
+    subject: "Reset your password",
+    html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p>`,
+  });
 }
 ```
 
-### Step 6: Add Next.js Middleware for Route Protection
+#### 1.3 Create forgot password API — `src/app/api/auth/forgot-password/route.ts`
 
-**New file: `src/middleware.ts`**
+POST handler:
+1. Accept `{ email }` in request body
+2. Look up user by email — if not found, still return 200 (prevent enumeration)
+3. Delete any existing tokens for this email in `VerificationToken`
+4. Generate a random token, hash it, store in `VerificationToken` with 1-hour expiry
+5. Send reset email with the unhashed token
+6. Return `{ success: true }`
+
+#### 1.4 Create reset password API — `src/app/api/auth/reset-password/route.ts`
+
+POST handler:
+1. Accept `{ email, token, password }` in request body
+2. Look up token in `VerificationToken` by identifier (email) — compare hashed values
+3. Check expiry — reject if expired
+4. Validate new password (8+ chars)
+5. Hash new password with bcrypt, update user's `hashedPassword`
+6. Delete the used token
+7. Return `{ success: true }`
+
+#### 1.5 Create forgot password page — `src/app/forgot-password/page.tsx`
+
+Client component with:
+- Email input field
+- "Send reset link" button
+- Success message: "If an account exists with that email, we've sent a reset link."
+- Link back to login
+
+#### 1.6 Create reset password page — `src/app/reset-password/page.tsx`
+
+Client component with:
+- Reads `token` and `email` from URL search params
+- New password + confirm password fields
+- "Reset password" button → POSTs to `/api/auth/reset-password`
+- On success: redirect to `/login` with a success message
+- Error display for expired/invalid tokens
+
+#### 1.7 Update login page — `src/components/LoginForm.tsx`
+
+- Add "Forgot password?" link below the password field, pointing to `/forgot-password`
+
+#### 1.8 Update middleware — `src/middleware.ts`
+
+- Add `forgot-password` and `reset-password` to the matcher exclusion list so unauthenticated users can access them
+
+---
+
+## Feature 2: Google OAuth
+
+### Design Decisions
+
+| Decision | Choice |
+|----------|--------|
+| Provider | Google via `next-auth/providers/google` |
+| Account linking | Automatic — if a Google account's email matches an existing credentials user, link them via the `Account` table |
+| Schema changes | None — `Account` model already supports OAuth fields |
+| Session strategy | JWT (unchanged — works with both Credentials and OAuth) |
+
+### Steps
+
+#### 2.1 Add Google provider to auth config — `src/lib/auth.ts`
 
 ```typescript
-export { auth as middleware } from "@/lib/auth"
+import Google from "next-auth/providers/google"
 
-export const config = {
-  matcher: [
-    // Protect all routes except auth pages, API auth routes, and static files
-    "/((?!login|register|api/auth|_next/static|_next/image|favicon.ico).*)",
-  ],
-}
+providers: [
+  Google({
+    clientId: process.env.GOOGLE_CLIENT_ID!,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  }),
+  Credentials({ ... }),  // existing
+]
 ```
 
-Also update Auth.js config to add an `authorized` callback that redirects unauthenticated users:
+#### 2.2 Add Google provider stub to `src/lib/auth.config.ts`
+
+The middleware config needs the provider list to match. Add a Google provider stub (like the existing Credentials stub):
+
+```typescript
+import Google from "next-auth/providers/google"
+
+providers: [
+  Google,  // stub for middleware
+  Credentials({ ... }),  // existing stub
+]
+```
+
+#### 2.3 Handle account linking — `src/lib/auth.ts`
+
+Add a `signIn` callback to auto-link Google accounts when the email already exists as a credentials user:
 
 ```typescript
 callbacks: {
-  authorized({ auth, request }) {
-    const isLoggedIn = !!auth?.user
-    const isAuthPage = request.nextUrl.pathname.startsWith("/login") ||
-                       request.nextUrl.pathname.startsWith("/register")
-    if (isAuthPage) return true  // Always allow auth pages
-    return isLoggedIn            // Require login for everything else
+  async signIn({ user, account }) {
+    if (account?.provider === "google") {
+      const existingUser = await prisma.user.findUnique({
+        where: { email: user.email! },
+      })
+      if (existingUser) {
+        // Link the Google account to the existing user
+        await prisma.account.upsert({
+          where: {
+            provider_providerAccountId: {
+              provider: account.provider,
+              providerAccountId: account.providerAccountId,
+            },
+          },
+          create: { ...account, userId: existingUser.id },
+          update: {},
+        })
+        // Update token to use existing user's ID
+        user.id = existingUser.id
+      }
+    }
+    return true
   },
-  // ... existing jwt and session callbacks
+  // ... existing callbacks
 }
 ```
 
-> **Note:** Next.js 16 renamed `middleware.ts` to `proxy.ts`. If the app uses Next.js 16's new proxy feature, the file may need to be `src/proxy.ts` instead. We'll verify during implementation.
+#### 2.4 Update login page — `src/components/LoginForm.tsx`
 
-### Step 7: Create Login Page
+- Add a "Sign in with Google" button that calls `signIn("google")`
+- Add a visual divider ("or") between OAuth and credentials form
 
-**New file: `src/app/login/page.tsx`**
+#### 2.5 Update register page — `src/components/RegisterForm.tsx`
 
-A client component with:
-- Email and password input fields
-- "Sign in" button that calls `signIn("credentials", { email, password })`
-- Link to `/register` for new users
-- Error display for invalid credentials
-- Styling consistent with existing Tailwind design (centered card, max-w-md)
+- Add a "Sign up with Google" button that calls `signIn("google")`
+- Add a visual divider ("or") between OAuth and credentials form
 
-### Step 8: Create Register Page
+#### 2.6 Environment variables
 
-**New file: `src/app/register/page.tsx`**
-
-A client component with:
-- Name (optional), email, and password input fields
-- Password confirmation field
-- "Create account" button that POSTs to `/api/auth/register`, then auto-signs in
-- Link to `/login` for existing users
-- Client-side validation (password length, matching confirmation)
-- Error display for duplicate emails, validation errors
-
-### Step 9: Update Root Layout
-
-**File: `src/app/layout.tsx`**
-
-Changes:
-- Wrap the app with `SessionProvider` from `next-auth/react`
-- Replace the static nav with an auth-aware nav that shows:
-  - When logged in: "History" link + user name/email + "Sign out" button
-  - When not logged in: "Sign in" / "Register" links (only visible on auth pages since middleware redirects)
-
-### Step 10: Update API Routes — Add Auth Guards
-
-**File: `src/app/api/tasks/route.ts`**
-
-- Import `auth` from `@/lib/auth`
-- In `POST`: get session, reject if unauthenticated, include `userId` when creating task
-- In `GET`: get session, reject if unauthenticated, filter tasks by `userId`
-
-**File: `src/app/api/tasks/[id]/route.ts`**
-
-- In `GET`: get session, verify the task belongs to the authenticated user
-
-**File: `src/app/api/steps/[id]/route.ts`**
-
-- In `PATCH`: get session, verify the step's parent task belongs to the authenticated user
-
-### Step 11: Update Pages — Auth-Aware Data Fetching
-
-**File: `src/app/history/page.tsx`**
-
-- Get session server-side and pass userId to the query (already filtered at API level, but for direct DB queries in server components, add userId filter)
-
-**File: `src/app/task/[id]/page.tsx`**
-
-- Verify task ownership before rendering
-
-### Step 12: Add AUTH_SECRET Environment Variable
-
-**File: `.env` (local, gitignored)**
-
+New env vars required:
 ```
-AUTH_SECRET=<generated-secret>
-AUTH_TRUST_HOST=true
+GOOGLE_CLIENT_ID=<from Google Cloud Console>
+GOOGLE_CLIENT_SECRET=<from Google Cloud Console>
+RESEND_API_KEY=<from resend.com dashboard>
+EMAIL_FROM=noreply@yourdomain.com
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
-
-Generate with: `npx auth secret`
 
 ---
 
@@ -322,38 +201,25 @@ Generate with: `npx auth secret`
 
 | Action | File | Purpose |
 |--------|------|---------|
-| **Modify** | `package.json` | Add auth dependencies |
-| **Modify** | `prisma/schema.prisma` | Add User, Account, Session, VerificationToken models; add userId to Task |
-| **Create** | `src/lib/auth.ts` | Auth.js configuration (providers, callbacks, adapter) |
-| **Create** | `src/app/api/auth/[...nextauth]/route.ts` | NextAuth API route handler |
-| **Create** | `src/app/api/auth/register/route.ts` | User registration endpoint |
-| **Create** | `src/middleware.ts` | Route protection middleware |
-| **Create** | `src/app/login/page.tsx` | Login page UI |
-| **Create** | `src/app/register/page.tsx` | Registration page UI |
-| **Modify** | `src/app/layout.tsx` | Add SessionProvider, auth-aware nav |
-| **Modify** | `src/app/api/tasks/route.ts` | Add auth guards, userId scoping |
-| **Modify** | `src/app/api/tasks/[id]/route.ts` | Add auth guard, ownership check |
-| **Modify** | `src/app/api/steps/[id]/route.ts` | Add auth guard, ownership check |
-| **Modify** | `src/app/history/page.tsx` | Auth-aware data fetching |
-| **Modify** | `src/app/task/[id]/page.tsx` | Ownership verification |
+| **Install** | `package.json` | Add `resend` |
+| **Create** | `src/lib/email.ts` | Email sending utility |
+| **Create** | `src/app/api/auth/forgot-password/route.ts` | Forgot password endpoint |
+| **Create** | `src/app/api/auth/reset-password/route.ts` | Reset password endpoint |
+| **Create** | `src/app/forgot-password/page.tsx` | Forgot password page |
+| **Create** | `src/app/reset-password/page.tsx` | Reset password page |
+| **Modify** | `src/lib/auth.ts` | Add Google provider + account linking callback |
+| **Modify** | `src/lib/auth.config.ts` | Add Google provider stub for middleware |
+| **Modify** | `src/components/LoginForm.tsx` | Add "Forgot password?" link + Google button |
+| **Modify** | `src/components/RegisterForm.tsx` | Add Google sign-up button |
+| **Modify** | `src/middleware.ts` | Allow unauthenticated access to forgot/reset pages |
 
 ---
 
 ## Security Considerations
 
-1. **Password hashing**: bcryptjs with 12 salt rounds
-2. **JWT sessions**: Signed with AUTH_SECRET, no sensitive data in token
-3. **CSRF protection**: Built into NextAuth.js
-4. **Input validation**: Email format, password minimum length (8 chars)
-5. **Authorization**: Every API route and page verifies ownership before serving data
-6. **SQL injection**: Prevented by Prisma's parameterized queries
-7. **Rate limiting**: Not included in initial implementation (can be added later)
-
-## Out of Scope (Future Enhancements)
-
-- Password reset / forgot password flow
-- Email verification
-- OAuth providers (Google, GitHub)
-- Rate limiting on login/register
-- Account settings page
-- Profile management
+1. **Token hashing** — reset tokens are hashed before storage; only the hash is in the DB
+2. **Timing-safe responses** — forgot password always returns success (prevents email enumeration)
+3. **Token expiry** — 1-hour TTL on reset tokens
+4. **Single-use tokens** — deleted after successful reset
+5. **Account linking** — only links when Google email matches an existing user's email exactly
+6. **CSRF** — protected by NextAuth.js built-in CSRF for OAuth flows
