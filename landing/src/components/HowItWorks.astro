@@ -1,0 +1,142 @@
+---
+
+---
+
+<section class="how-it-works" id="how-it-works">
+  <div class="section-header">
+    <h2>Three taps. That's it.</h2>
+    <p>No setup, no configuration, no learning curve.</p>
+  </div>
+
+  <div class="steps-row">
+    <div class="step-item">
+      <div class="step-number">1</div>
+      <h3>Type your task</h3>
+      <p>
+        Write whatever is on your mind. "Do laundry," "apply for jobs," "clean
+        the garage" — messy is fine. We don't judge.
+      </p>
+    </div>
+
+    <div class="connector">
+      <svg width="40" height="2" viewBox="0 0 40 2">
+        <line x1="0" y1="1" x2="40" y2="1" stroke="#d6d3d1" stroke-width="2" stroke-dasharray="4 4" />
+      </svg>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">2</div>
+      <h3>AI breaks it down</h3>
+      <p>
+        Claude AI turns your task into 5&ndash;15 concrete micro-steps. Each one
+        starts with a verb and takes under 2 minutes.
+      </p>
+    </div>
+
+    <div class="connector">
+      <svg width="40" height="2" viewBox="0 0 40 2">
+        <line x1="0" y1="1" x2="40" y2="1" stroke="#d6d3d1" stroke-width="2" stroke-dasharray="4 4" />
+      </svg>
+    </div>
+
+    <div class="step-item">
+      <div class="step-number">3</div>
+      <h3>Tap through each step</h3>
+      <p>
+        One step on screen at a time. Hit "Done" and move on. Watch the progress
+        bar fill up. Celebrate when you finish.
+      </p>
+    </div>
+  </div>
+</section>
+
+<style>
+  .how-it-works {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 6rem 1.5rem;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: 3.5rem;
+  }
+
+  .section-header h2 {
+    font-size: 2.25rem;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    color: var(--stone-900);
+    margin-bottom: 0.75rem;
+  }
+
+  .section-header p {
+    font-size: 1.125rem;
+    color: var(--stone-500);
+  }
+
+  .steps-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .step-item {
+    flex: 1;
+    max-width: 300px;
+    text-align: center;
+    padding: 0 1.5rem;
+  }
+
+  .step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    background: var(--amber-500);
+    color: white;
+    font-weight: 700;
+    font-size: 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .step-item h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--stone-800);
+    margin-bottom: 0.625rem;
+  }
+
+  .step-item p {
+    font-size: 0.925rem;
+    color: var(--stone-500);
+    line-height: 1.65;
+  }
+
+  .connector {
+    display: flex;
+    align-items: center;
+    padding-top: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 768px) {
+    .steps-row {
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .connector {
+      transform: rotate(90deg);
+      padding-top: 0;
+    }
+
+    .step-item {
+      max-width: 100%;
+    }
+  }
+</style>

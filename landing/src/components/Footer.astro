@@ -1,0 +1,84 @@
+---
+
+---
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <span class="footer-logo">👣 Tiny Steps</span>
+      <p>Break it down. Get it done.</p>
+    </div>
+    <div class="footer-links">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
+      <a href="#why">Why It Works</a>
+    </div>
+    <div class="footer-copy">
+      &copy; {new Date().getFullYear()} Tiny Steps. Built with care for ADHD brains.
+    </div>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid var(--stone-200);
+    background: white;
+  }
+
+  .footer-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+  }
+
+  .footer-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .footer-logo {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--stone-800);
+  }
+
+  .footer-brand p {
+    font-size: 0.8rem;
+    color: var(--stone-400);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .footer-links a {
+    text-decoration: none;
+    color: var(--stone-500);
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover {
+    color: var(--stone-800);
+  }
+
+  .footer-copy {
+    font-size: 0.775rem;
+    color: var(--stone-400);
+  }
+
+  @media (max-width: 640px) {
+    .footer-inner {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+</style>
