@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 const VALID_MOODS = ["calm", "excited", "anxious", "frustrated", "tired"];
 const VALID_TIMINGS = ["before", "after"];
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (!body) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json(
         { error: "Invalid request body." },
         { status: 400 }
@@ -56,8 +57,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Task not found." }, { status: 404 });
     }
 
-    const checkIn = await prisma.moodCheckIn.create({
-      data: {
+    const checkIn = await prisma.moodCheckIn.upsert({
+      where: {
+        taskId_userId_timing: { taskId, userId: session.user.id, timing },
+      },
+      update: { mood },
+      create: {
         taskId,
         userId: session.user.id,
         mood,
@@ -70,7 +75,8 @@ export async function POST(request: Request) {
       mood: checkIn.mood,
       timing: checkIn.timing,
     });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/mood" }, "Failed to save mood check-in");
     return NextResponse.json(
       { error: "Failed to save mood check-in." },
       { status: 500 }

@@ -2,14 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-
-const MOOD_EMOJIS: Record<string, string> = {
-  calm: "\u{1F60C}",
-  excited: "\u2728",
-  anxious: "\u{1F630}",
-  frustrated: "\u{1F624}",
-  tired: "\u{1F971}",
-};
+import { MOOD_EMOJIS } from "@/lib/moods";
 
 interface CelebrationProps {
   taskTitle: string;
@@ -19,6 +12,8 @@ interface CelebrationProps {
 
 export default function Celebration({ taskTitle, moodBefore, moodAfter }: CelebrationProps) {
   useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
     import("canvas-confetti").then((mod) => {
       const confetti = mod.default;
       const duration = 3000;
@@ -59,10 +54,13 @@ export default function Celebration({ taskTitle, moodBefore, moodAfter }: Celebr
       <p className="text-stone-400 mb-10">&ldquo;{taskTitle}&rdquo;</p>
 
       {moodBefore && moodAfter && (
-        <div className="flex items-center gap-2 bg-stone-50 rounded-full px-4 py-2 mb-6">
-          <span>{MOOD_EMOJIS[moodBefore] ?? moodBefore}</span>
-          <span className="text-stone-300">&rarr;</span>
-          <span>{MOOD_EMOJIS[moodAfter] ?? moodAfter}</span>
+        <div
+          className="flex items-center gap-2 bg-stone-50 rounded-full px-4 py-2 mb-6"
+          aria-label={`Mood before: ${moodBefore}. Mood after: ${moodAfter}.`}
+        >
+          <span aria-hidden="true">{MOOD_EMOJIS[moodBefore] ?? moodBefore}</span>
+          <span aria-hidden="true" className="text-stone-300">&rarr;</span>
+          <span aria-hidden="true">{MOOD_EMOJIS[moodAfter] ?? moodAfter}</span>
         </div>
       )}
 

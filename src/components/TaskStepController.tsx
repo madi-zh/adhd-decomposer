@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
 import FocusRoomInvite from "@/components/FocusRoomInvite";
-import MoodCheckIn from "@/components/MoodCheckIn";
 
 const Celebration = dynamic(() => import("@/components/Celebration"), {
   ssr: false,
@@ -18,6 +17,11 @@ const FocusRoomPresenceBar = dynamic(
 
 const MicroRegulation = dynamic(
   () => import("@/components/MicroRegulation"),
+  { ssr: false }
+);
+
+const MoodCheckIn = dynamic(
+  () => import("@/components/MoodCheckIn"),
   { ssr: false }
 );
 
@@ -59,11 +63,9 @@ function getInitialPhase(moodCheckIns?: ExistingMoodCheckIn[], allStepsComplete?
 export default function TaskStepController({
   task: initialTask,
   initialFocusCount = 0,
-  taskId,
 }: {
   task: Task;
   initialFocusCount?: number;
-  taskId?: string;
 }) {
   const [steps, setSteps] = useState(initialTask.steps);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -83,23 +85,26 @@ export default function TaskStepController({
     initialTask.moodCheckIns?.find((m) => m.timing === "after")?.mood ?? null
   );
 
-  let completedCount = 0;
-  let currentStep: Step | undefined;
+  const { completedCount, currentStep } = useMemo(() => {
+    let completed = 0;
+    let current: Step | undefined;
 
-  for (const s of steps) {
-    if (s.isCompleted) {
-      completedCount++;
-    } else if (!currentStep) {
-      currentStep = s;
+    for (const s of steps) {
+      if (s.isCompleted) {
+        completed++;
+      } else if (!current) {
+        current = s;
+      }
     }
-  }
+    return { completedCount: completed, currentStep: current };
+  }, [steps]);
 
   const handleJoinFocusRoom = useCallback(async () => {
     try {
       const res = await fetch("/api/focus-room/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
+        body: JSON.stringify({ taskId: initialTask.id }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -109,45 +114,44 @@ export default function TaskStepController({
       // If join fails, just proceed
     }
     setPhase("mood-before");
-  }, [taskId]);
+  }, [initialTask.id]);
 
   const handleSkipFocusRoom = useCallback(() => {
     setPhase("mood-before");
   }, []);
 
-  function handleMoodBeforeComplete(mood: string) {
+  const handleMoodBeforeComplete = useCallback((mood: string) => {
     setMoodBefore(mood);
     if (DISTRESSED_MOODS.includes(mood)) {
       setPhase("regulation");
     } else {
       setPhase("steps");
     }
-  }
+  }, []);
 
-  function handleMoodBeforeSkip() {
+  const handleMoodBeforeSkip = useCallback(() => {
     setPhase("steps");
-  }
+  }, []);
 
-  function handleRegulationComplete() {
+  const handleRegulationDone = useCallback(() => {
     setPhase("steps");
-  }
+  }, []);
 
-  function handleRegulationSkip() {
-    setPhase("steps");
-  }
-
-  function handleMoodAfterComplete(mood: string) {
+  const handleMoodAfterComplete = useCallback((mood: string) => {
     setMoodAfter(mood);
     setPhase("celebration");
-  }
+  }, []);
 
-  function handleMoodAfterSkip() {
+  const handleMoodAfterSkip = useCallback(() => {
     setPhase("celebration");
-  }
+  }, []);
 
   async function handleStepComplete() {
     if (isCompleting || !currentStep) return;
     const activeStep = currentStep;
+    // Capture before optimistic update — if only 1 incomplete, this is the last step
+    const isLastStep = steps.filter((s) => !s.isCompleted).length === 1;
+
     setIsCompleting(true);
     setError("");
 
@@ -158,17 +162,15 @@ export default function TaskStepController({
       )
     );
 
+    if (isLastStep) {
+      setPhase("mood-after");
+    }
+
     try {
       const res = await fetch(`/api/steps/${activeStep.id}`, {
         method: "PATCH",
       });
       if (!res.ok) throw new Error();
-
-      // Check if this was the last step
-      const isLastStep = steps.filter((s) => !s.isCompleted).length === 1;
-      if (isLastStep) {
-        setPhase("mood-after");
-      }
     } catch {
       // Revert on failure
       setSteps((prev) =>
@@ -176,6 +178,9 @@ export default function TaskStepController({
           s.id === activeStep.id ? { ...s, isCompleted: false } : s
         )
       );
+      if (isLastStep) {
+        setPhase("steps");
+      }
       setError("Could not save progress. Please try again.");
     } finally {
       setIsCompleting(false);
@@ -203,14 +208,18 @@ export default function TaskStepController({
     );
   }
 
-  if (phase === "regulation" && moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
-    return (
-      <MicroRegulation
-        mood={moodBefore as "anxious" | "frustrated" | "tired"}
-        onComplete={handleRegulationComplete}
-        onSkip={handleRegulationSkip}
-      />
-    );
+  if (phase === "regulation") {
+    if (moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
+      return (
+        <MicroRegulation
+          mood={moodBefore as "anxious" | "frustrated" | "tired"}
+          onComplete={handleRegulationDone}
+          onSkip={handleRegulationDone}
+        />
+      );
+    }
+    setPhase("steps");
+    return null;
   }
 
   if (phase === "mood-after") {

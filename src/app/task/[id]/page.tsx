@@ -27,6 +27,7 @@ export default async function TaskPage({
         steps: { orderBy: { orderIndex: "asc" } },
         moodCheckIns: {
           select: { mood: true, timing: true },
+          orderBy: { createdAt: "asc" },
         },
       },
     }),
@@ -53,7 +54,6 @@ export default async function TaskPage({
         })),
       }}
       initialFocusCount={focusCount}
-      taskId={task.id}
     />
   );
 }

@@ -1,14 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const MOODS = [
-  { key: "calm", emoji: "\u{1F60C}", label: "Calm" },
-  { key: "excited", emoji: "\u2728", label: "Excited" },
-  { key: "anxious", emoji: "\u{1F630}", label: "Anxious" },
-  { key: "frustrated", emoji: "\u{1F624}", label: "Frustrated" },
-  { key: "tired", emoji: "\u{1F971}", label: "Tired" },
-] as const;
+import { MOODS } from "@/lib/moods";
 
 interface MoodCheckInProps {
   taskId: string;
@@ -24,17 +17,28 @@ export default function MoodCheckIn({
   onSkip,
 }: MoodCheckInProps) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [saveError, setSaveError] = useState(false);
 
-  function handleSelect(mood: string) {
+  async function handleSelect(mood: string) {
+    if (submitted) return;
+    setSubmitted(true);
     setSelected(mood);
-    onComplete(mood);
+    setSaveError(false);
 
-    // Fire-and-forget save
-    fetch("/api/mood", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, mood, timing }),
-    }).catch(() => {});
+    try {
+      const res = await fetch("/api/mood", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskId, mood, timing }),
+      });
+      if (!res.ok) throw new Error();
+      onComplete(mood);
+    } catch {
+      setSaveError(true);
+      setSubmitted(false);
+      setSelected(null);
+    }
   }
 
   return (
@@ -45,29 +49,38 @@ export default function MoodCheckIn({
           : "How do you feel after finishing?"}
       </h2>
 
-      <div role="radiogroup" aria-label="Mood selection" className="flex gap-3 flex-wrap justify-center">
+      {saveError && (
+        <p role="alert" className="text-red-500 text-sm text-center mb-4">
+          Could not save. Please try again.
+        </p>
+      )}
+
+      <div role="group" aria-label="Mood selection" className="flex gap-3 flex-wrap justify-center">
         {MOODS.map((mood) => (
           <button
             key={mood.key}
-            role="radio"
-            aria-checked={selected === mood.key}
+            disabled={submitted}
+            aria-pressed={selected === mood.key}
             data-selected={selected === mood.key || undefined}
             onClick={() => handleSelect(mood.key)}
             className="flex flex-col items-center gap-1 p-4 rounded-2xl border-2 border-stone-200
                        hover:border-amber-400 transition-all w-20
+                       focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2
+                       disabled:opacity-50 disabled:cursor-not-allowed
                        data-[selected]:border-amber-500 data-[selected]:bg-amber-50 data-[selected]:scale-105"
           >
             <span className="text-3xl" aria-hidden="true">
               {mood.emoji}
             </span>
-            <span className="text-xs text-stone-500">{mood.label}</span>
+            <span className="text-xs text-stone-600">{mood.label}</span>
           </button>
         ))}
       </div>
 
       <button
         onClick={onSkip}
-        className="text-xs text-stone-400 hover:text-stone-500 mt-6"
+        disabled={submitted}
+        className="text-xs text-stone-400 hover:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 rounded mt-6 disabled:opacity-50"
       >
         Skip
       </button>

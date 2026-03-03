@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface MicroRegulationProps {
   mood: "anxious" | "frustrated" | "tired";
@@ -10,42 +10,44 @@ interface MicroRegulationProps {
 
 // --- Box Breathing (anxious) ---
 
+const BREATHING_PHASES = ["Breathe in...", "Hold...", "Breathe out...", "Hold..."] as const;
+
 function BoxBreathing({ onComplete }: { onComplete: () => void }) {
-  const phases = ["Breathe in...", "Hold...", "Breathe out...", "Hold..."] as const;
   const [phaseIndex, setPhaseIndex] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
+  const completed = useRef(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPhaseIndex((prev) => (prev + 1) % phases.length);
+    const phaseInterval = setInterval(() => {
+      setPhaseIndex((prev) => (prev + 1) % BREATHING_PHASES.length);
     }, 4000);
-    return () => clearInterval(interval);
-  }, [phases.length]);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsed((prev) => prev + 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    const timeout = setTimeout(() => {
+      if (!completed.current) {
+        completed.current = true;
+        onComplete();
+      }
+    }, 30000);
 
-  useEffect(() => {
-    if (elapsed >= 30) {
-      onComplete();
-    }
-  }, [elapsed, onComplete]);
+    return () => {
+      clearInterval(phaseInterval);
+      clearTimeout(timeout);
+    };
+  }, [onComplete]);
 
   const isExpanded = phaseIndex === 0 || phaseIndex === 1;
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   return (
     <>
       <div
-        className={`w-32 h-32 rounded-full border-4 border-amber-400 transition-all duration-[4000ms] ${
-          isExpanded ? "scale-125 bg-amber-100" : "scale-100 bg-white"
+        className={`w-32 h-32 rounded-full border-4 border-amber-400 ${
+          prefersReducedMotion
+            ? (isExpanded ? "bg-amber-100" : "bg-white")
+            : `transition-all duration-[4000ms] ${isExpanded ? "scale-125 bg-amber-100" : "scale-100 bg-white"}`
         }`}
       />
       <p aria-live="polite" className="text-lg text-stone-600 mt-8">
-        {phases[phaseIndex]}
+        {BREATHING_PHASES[phaseIndex]}
       </p>
     </>
   );
@@ -62,6 +64,7 @@ const REFRAME_CARDS = [
 function CbtReframe({ onComplete }: { onComplete: () => void }) {
   const [cardIndex, setCardIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+  const innerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (cardIndex >= REFRAME_CARDS.length - 1) {
@@ -71,16 +74,20 @@ function CbtReframe({ onComplete }: { onComplete: () => void }) {
 
     const timer = setTimeout(() => {
       setVisible(false);
-      setTimeout(() => {
+      innerTimer.current = setTimeout(() => {
         setCardIndex((prev) => prev + 1);
         setVisible(true);
       }, 500);
     }, 8000);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (innerTimer.current) clearTimeout(innerTimer.current);
+    };
   }, [cardIndex, onComplete]);
 
   return (
     <div
+      aria-live="polite"
       className={`bg-amber-50 rounded-2xl p-6 text-center text-lg text-stone-700 max-w-sm transition-opacity duration-500 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
@@ -116,7 +123,7 @@ function Grounding({ onComplete }: { onComplete: () => void }) {
   }, [step, onComplete]);
 
   return (
-    <p className="text-xl font-medium text-stone-700">
+    <p aria-live="polite" className="text-xl font-medium text-stone-700">
       {GROUNDING_PROMPTS[step]}
     </p>
   );
@@ -129,19 +136,15 @@ export default function MicroRegulation({
   onComplete,
   onSkip,
 }: MicroRegulationProps) {
-  const handleComplete = useCallback(() => {
-    onComplete();
-  }, [onComplete]);
-
   return (
     <div className="flex flex-col items-center justify-center pt-12">
-      {mood === "anxious" && <BoxBreathing onComplete={handleComplete} />}
-      {mood === "frustrated" && <CbtReframe onComplete={handleComplete} />}
-      {mood === "tired" && <Grounding onComplete={handleComplete} />}
+      {mood === "anxious" && <BoxBreathing onComplete={onComplete} />}
+      {mood === "frustrated" && <CbtReframe onComplete={onComplete} />}
+      {mood === "tired" && <Grounding onComplete={onComplete} />}
 
       <button
         onClick={onSkip}
-        className="text-sm text-stone-400 hover:text-stone-500 mt-8"
+        className="text-sm text-stone-400 hover:text-stone-500 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 rounded mt-8"
       >
         I&apos;m ready to start
       </button>
