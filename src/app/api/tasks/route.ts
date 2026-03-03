@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     if (!body) {
       return NextResponse.json(
         { error: "Invalid request body." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     if (!input || typeof input !== "string" || input.trim().length === 0) {
       return NextResponse.json(
         { error: "Please enter a task to break down." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { error: "Failed to break down task. Please try again." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -81,7 +81,7 @@ export async function GET() {
   } catch {
     return NextResponse.json(
       { error: "Failed to load tasks." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
