@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   _request: Request,
@@ -22,7 +23,8 @@ export async function GET(
     }
 
     return NextResponse.json(task);
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "GET /api/tasks/[id]" }, "Failed to load task");
     return NextResponse.json(
       { error: "Failed to load task." },
       { status: 500 }

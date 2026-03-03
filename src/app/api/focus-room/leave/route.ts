@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 async function handleLeave(request: Request) {
   try {
@@ -22,7 +23,8 @@ async function handleLeave(request: Request) {
     }
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST/DELETE /api/focus-room/leave" }, "Failed to leave focus room");
     return NextResponse.json(
       { error: "Failed to leave focus room." },
       { status: 500 }

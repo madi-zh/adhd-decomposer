@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { decomposeTask } from "@/lib/claude";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -50,7 +51,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(task);
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/tasks" }, "Failed to decompose task");
     return NextResponse.json(
       { error: "Failed to break down task. Please try again." },
       { status: 500 },
@@ -78,7 +80,8 @@ export async function GET() {
     });
 
     return NextResponse.json(tasks);
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "GET /api/tasks" }, "Failed to load tasks");
     return NextResponse.json(
       { error: "Failed to load tasks." },
       { status: 500 },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   try {
@@ -16,7 +17,8 @@ export async function GET() {
     });
 
     return NextResponse.json({ activeCount });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "GET /api/focus-room/count" }, "Failed to get focus room count");
     return NextResponse.json(
       { error: "Failed to get focus room count." },
       { status: 500 }

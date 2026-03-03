@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -69,7 +70,8 @@ export async function POST(request: Request) {
       })),
       totalActive,
     });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/focus-room/ping" }, "Failed to ping focus room");
     return NextResponse.json(
       { error: "Failed to ping focus room." },
       { status: 500 }
