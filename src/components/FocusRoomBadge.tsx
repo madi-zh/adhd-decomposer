@@ -13,9 +13,8 @@ export default function FocusRoomBadge() {
           const data = await res.json();
           setCount(data.activeCount);
         }
-        console.log(res);
-      } catch (exc) {
-        console.log(exc);
+      } catch {
+        // Silently fail — badge is non-critical
       }
     }
 

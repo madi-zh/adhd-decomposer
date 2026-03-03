@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 
-export async function DELETE(request: Request) {
+async function handleLeave(request: Request) {
   try {
     const [session, body] = await Promise.all([
       auth(),
@@ -28,4 +28,13 @@ export async function DELETE(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE(request: Request) {
+  return handleLeave(request);
+}
+
+// POST handler for navigator.sendBeacon which always sends POST
+export async function POST(request: Request) {
+  return handleLeave(request);
 }
