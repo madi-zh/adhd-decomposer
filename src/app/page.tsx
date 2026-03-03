@@ -1,5 +1,13 @@
 import TaskInput from "@/components/TaskInput";
+import FocusRoomBadge from "@/components/FocusRoomBadge";
 
 export default function Home() {
-  return <TaskInput />;
+  return (
+    <>
+      <div className="flex justify-center mb-4">
+        <FocusRoomBadge />
+      </div>
+      <TaskInput />
+    </>
+  );
 }

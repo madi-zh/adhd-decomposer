@@ -3,6 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import TaskStepController from "@/components/TaskStepController";
 
+async function getActiveFocusCount() {
+  const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000);
+  return prisma.focusRoomPresence.count({
+    where: { lastPingAt: { gt: twoMinAgo } },
+  });
+}
+
 export default async function TaskPage({
   params,
 }: {
@@ -13,10 +20,13 @@ export default async function TaskPage({
     redirect("/login");
   }
 
-  const task = await prisma.task.findUnique({
-    where: { id, userId: session.user.id },
-    include: { steps: { orderBy: { orderIndex: "asc" } } },
-  });
+  const [task, focusCount] = await Promise.all([
+    prisma.task.findUnique({
+      where: { id, userId: session.user.id },
+      include: { steps: { orderBy: { orderIndex: "asc" } } },
+    }),
+    getActiveFocusCount(),
+  ]);
 
   if (!task) {
     notFound();
@@ -32,6 +42,8 @@ export default async function TaskPage({
           isCompleted: s.isCompleted,
         })),
       }}
+      initialFocusCount={focusCount}
+      taskId={task.id}
     />
   );
 }
