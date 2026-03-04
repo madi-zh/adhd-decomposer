@@ -1,11 +1,27 @@
-export const MOODS = [
-  { key: "calm", emoji: "\u{1F60C}", label: "Calm" },
-  { key: "excited", emoji: "\u2728", label: "Excited" },
-  { key: "anxious", emoji: "\u{1F630}", label: "Anxious" },
-  { key: "frustrated", emoji: "\u{1F624}", label: "Frustrated" },
-  { key: "tired", emoji: "\u{1F971}", label: "Tired" },
-] as const;
+import {
+  CloudSun,
+  Sparkles,
+  CloudLightning,
+  Flame,
+  Moon,
+  type LucideIcon,
+} from "lucide-react";
 
-export const MOOD_EMOJIS: Record<string, string> = Object.fromEntries(
-  MOODS.map((m) => [m.key, m.emoji])
+export interface Mood {
+  key: string;
+  icon: LucideIcon;
+  color: string;
+  label: string;
+}
+
+export const MOODS: Mood[] = [
+  { key: "calm", icon: CloudSun, color: "text-sky-500", label: "Calm" },
+  { key: "excited", icon: Sparkles, color: "text-amber-500", label: "Excited" },
+  { key: "anxious", icon: CloudLightning, color: "text-violet-500", label: "Anxious" },
+  { key: "frustrated", icon: Flame, color: "text-red-500", label: "Frustrated" },
+  { key: "tired", icon: Moon, color: "text-indigo-400", label: "Tired" },
+];
+
+export const MOOD_MAP: Record<string, Mood> = Object.fromEntries(
+  MOODS.map((m) => [m.key, m])
 );
