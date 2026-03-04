@@ -63,13 +63,13 @@ export default function Celebration({ taskTitle, moodBefore, moodAfter }: Celebr
           aria-label={`Mood before: ${moodBefore}. Mood after: ${moodAfter}.`}
         >
           {BeforeIcon ? (
-            <BeforeIcon className={MOOD_MAP[moodBefore!].color} size={20} aria-hidden="true" />
+            <BeforeIcon className={MOOD_MAP[moodBefore!]?.color ?? ""} size={20} aria-hidden="true" />
           ) : (
             <span aria-hidden="true">{moodBefore}</span>
           )}
           <ArrowRight size={16} className="text-stone-300" aria-hidden="true" />
           {AfterIcon ? (
-            <AfterIcon className={MOOD_MAP[moodAfter!].color} size={20} aria-hidden="true" />
+            <AfterIcon className={MOOD_MAP[moodAfter!]?.color ?? ""} size={20} aria-hidden="true" />
           ) : (
             <span aria-hidden="true">{moodAfter}</span>
           )}
