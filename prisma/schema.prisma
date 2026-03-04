@@ -8,17 +8,19 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
+  id             String         @id @default(cuid())
   name           String?
-  email          String    @unique
+  email          String         @unique
   emailVerified  DateTime?
   hashedPassword String?
   image          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   accounts       Account[]
   sessions       Session[]
-  tasks          Task[]
+  tasks              Task[]
+  focusRoomPresence  FocusRoomPresence[]
+  moodCheckIns       MoodCheckIn[]
 }
 
 model Account {
@@ -56,16 +58,18 @@ model VerificationToken {
 }
 
 model Task {
-  id           String        @id @default(cuid())
-  title        String
-  rawInput     String
-  status       String        @default("active")
-  createdAt    DateTime      @default(now())
-  completedAt  DateTime?
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  steps        Step[]
-  timeEstimate TimeEstimate?
+  id          String    @id @default(cuid())
+  title       String
+  rawInput    String
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps              Step[]
+  timeEstimate       TimeEstimate?
+  focusRoomPresences FocusRoomPresence[]
+  moodCheckIns       MoodCheckIn[]
 }
 
 model TimeEstimate {
@@ -87,4 +91,34 @@ model Step {
   content     String
   isCompleted Boolean   @default(false)
   completedAt DateTime?
+}
+
+model FocusRoomPresence {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  avatarSeed  String
+  joinedAt    DateTime @default(now())
+  lastPingAt  DateTime @default(now())
+  stepContent String?
+
+  @@index([lastPingAt])
+  @@index([userId])
+}
+
+model MoodCheckIn {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mood      String
+  timing    String
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId, timing])
+  @@index([userId, createdAt])
+  @@index([taskId])
 }

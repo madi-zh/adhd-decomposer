@@ -1,6 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export async function PATCH(
   _request: Request,
@@ -65,7 +66,8 @@ export async function PATCH(
     });
 
     return NextResponse.json({ step: updatedStep });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "PATCH /api/steps/[id]" }, "Failed to update step");
     return NextResponse.json(
       { error: "Failed to update step." },
       { status: 500 }

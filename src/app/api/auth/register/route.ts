@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -51,7 +52,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true }, { status: 201 });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/auth/register" }, "Failed to create account");
     return NextResponse.json(
       { error: "Failed to create account. Please try again." },
       { status: 500 }

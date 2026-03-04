@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { NextResponse, after } from "next/server";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +46,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/auth/forgot-password" }, "Failed to process password reset request");
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }
