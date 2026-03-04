@@ -1,20 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { requireSession } from "@/lib/api-helpers";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const [session, { id }] = await Promise.all([auth(), params]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const [auth, { id }] = await Promise.all([requireSession(), params]);
+    if (auth.error) return auth.error;
 
     const task = await prisma.task.findUnique({
-      where: { id, userId: session.user.id },
+      where: { id, userId: auth.userId },
       include: { steps: { orderBy: { orderIndex: "asc" } } },
     });
 

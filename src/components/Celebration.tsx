@@ -2,16 +2,21 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
+import TimeComparison from "@/components/TimeComparison";
 import { MOOD_MAP } from "@/lib/moods";
 import { PartyPopper, ArrowRight } from "lucide-react";
 
 interface CelebrationProps {
   taskTitle: string;
+  timeEstimate?: {
+    estimateMinutes: number;
+    actualMinutes: number;
+  } | null;
   moodBefore?: string | null;
   moodAfter?: string | null;
 }
 
-export default function Celebration({ taskTitle, moodBefore, moodAfter }: CelebrationProps) {
+export default function Celebration({ taskTitle, timeEstimate, moodBefore, moodAfter }: CelebrationProps) {
   useEffect(() => {
     if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
@@ -56,6 +61,13 @@ export default function Celebration({ taskTitle, moodBefore, moodAfter }: Celebr
         You finished every single step.
       </p>
       <p className="text-stone-400 mb-10">&ldquo;{taskTitle}&rdquo;</p>
+
+      {timeEstimate ? (
+        <TimeComparison
+          estimateMinutes={timeEstimate.estimateMinutes}
+          actualMinutes={timeEstimate.actualMinutes}
+        />
+      ) : null}
 
       {moodBefore && moodAfter && (
         <div

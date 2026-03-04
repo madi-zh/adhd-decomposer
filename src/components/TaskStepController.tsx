@@ -4,7 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
-import FocusRoomInvite from "@/components/FocusRoomInvite";
+import ErrorAlert from "@/components/ErrorAlert";
+import { DISTRESSED_MOODS, type DistressedMood } from "@/lib/moods";
 
 const Celebration = dynamic(() => import("@/components/Celebration"), {
   ssr: false,
@@ -22,6 +23,21 @@ const MicroRegulation = dynamic(
 
 const MoodCheckIn = dynamic(
   () => import("@/components/MoodCheckIn"),
+  { ssr: false }
+);
+
+const TimeEstimatePrompt = dynamic(
+  () => import("@/components/TimeEstimatePrompt"),
+  { ssr: false }
+);
+
+const AmbientTimer = dynamic(
+  () => import("@/components/AmbientTimer"),
+  { ssr: false }
+);
+
+const FocusRoomInvite = dynamic(
+  () => import("@/components/FocusRoomInvite"),
   { ssr: false }
 );
 
@@ -43,28 +59,40 @@ interface Task {
   moodCheckIns?: ExistingMoodCheckIn[];
 }
 
-type Phase = "focus-room-invite" | "mood-before" | "regulation" | "steps" | "mood-after" | "celebration";
+interface TimeEstimateData {
+  estimateMinutes: number;
+  startedAt: string;
+  completedAt: string | null;
+  actualMinutes: number | null;
+}
 
-const DISTRESSED_MOODS = ["anxious", "frustrated", "tired"];
+type Phase = "focus-room-invite" | "mood-before" | "regulation" | "time-estimate" | "steps" | "mood-after" | "celebration";
 
-function getInitialPhase(moodCheckIns?: ExistingMoodCheckIn[], allStepsComplete?: boolean): Phase {
+function getInitialPhase(
+  moodCheckIns?: ExistingMoodCheckIn[],
+  allStepsComplete?: boolean,
+  hasTimeEstimate?: boolean
+): Phase {
   const hasBefore = moodCheckIns?.some((m) => m.timing === "before");
   const hasAfter = moodCheckIns?.some((m) => m.timing === "after");
 
   if (allStepsComplete) {
     return hasAfter ? "celebration" : "mood-after";
   }
-  // If they already did a before check-in, go straight to steps (skip focus room invite too)
-  if (hasBefore) return "steps";
-  // Otherwise start with focus room invite
+  // If they already did a before check-in, check if they need time estimate
+  if (hasBefore) {
+    return hasTimeEstimate ? "steps" : "time-estimate";
+  }
   return "focus-room-invite";
 }
 
 export default function TaskStepController({
   task: initialTask,
+  timeEstimate: initialEstimate,
   initialFocusCount = 0,
 }: {
   task: Task;
+  timeEstimate: TimeEstimateData | null;
   initialFocusCount?: number;
 }) {
   const [steps, setSteps] = useState(initialTask.steps);
@@ -73,13 +101,25 @@ export default function TaskStepController({
   const [focusRoom, setFocusRoom] = useState<{ presenceId: string } | null>(
     null
   );
+  const [estimate, setEstimate] = useState<{
+    estimateMinutes: number;
+    startedAt: string;
+  } | null>(
+    initialEstimate
+      ? {
+          estimateMinutes: initialEstimate.estimateMinutes,
+          startedAt: initialEstimate.startedAt,
+        }
+      : null
+  );
+  const [skippedEstimate, setSkippedEstimate] = useState(false);
 
-  const allStepsComplete = steps.every((s) => s.isCompleted);
   const existingBeforeMood = initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null;
 
-  const [phase, setPhase] = useState<Phase>(() =>
-    getInitialPhase(initialTask.moodCheckIns, allStepsComplete)
-  );
+  const [phase, setPhase] = useState<Phase>(() => {
+    const allComplete = initialTask.steps.every((s) => s.isCompleted);
+    return getInitialPhase(initialTask.moodCheckIns, allComplete, !!initialEstimate);
+  });
   const [moodBefore, setMoodBefore] = useState<string | null>(existingBeforeMood);
   const [moodAfter, setMoodAfter] = useState<string | null>(
     initialTask.moodCheckIns?.find((m) => m.timing === "after")?.mood ?? null
@@ -122,19 +162,19 @@ export default function TaskStepController({
 
   const handleMoodBeforeComplete = useCallback((mood: string) => {
     setMoodBefore(mood);
-    if (DISTRESSED_MOODS.includes(mood)) {
+    if ((DISTRESSED_MOODS as readonly string[]).includes(mood)) {
       setPhase("regulation");
     } else {
-      setPhase("steps");
+      setPhase("time-estimate");
     }
   }, []);
 
   const handleMoodBeforeSkip = useCallback(() => {
-    setPhase("steps");
+    setPhase("time-estimate");
   }, []);
 
   const handleRegulationDone = useCallback(() => {
-    setPhase("steps");
+    setPhase("time-estimate");
   }, []);
 
   const handleMoodAfterComplete = useCallback((mood: string) => {
@@ -146,10 +186,19 @@ export default function TaskStepController({
     setPhase("celebration");
   }, []);
 
+  const handleEstimateSet = useCallback((estimateMinutes: number, startedAt: string) => {
+    setEstimate({ estimateMinutes, startedAt });
+    setPhase("steps");
+  }, []);
+
+  const handleEstimateSkip = useCallback(() => {
+    setSkippedEstimate(true);
+    setPhase("steps");
+  }, []);
+
   async function handleStepComplete() {
     if (isCompleting || !currentStep) return;
     const activeStep = currentStep;
-    // Capture before optimistic update — if only 1 incomplete, this is the last step
     const isLastStep = steps.filter((s) => !s.isCompleted).length === 1;
 
     setIsCompleting(true);
@@ -208,12 +257,24 @@ export default function TaskStepController({
     );
   }
 
-  if (phase === "regulation" && moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
+  if (phase === "regulation" && moodBefore && (DISTRESSED_MOODS as readonly string[]).includes(moodBefore)) {
     return (
       <MicroRegulation
-        mood={moodBefore as "anxious" | "frustrated" | "tired"}
+        mood={moodBefore as DistressedMood}
         onComplete={handleRegulationDone}
         onSkip={handleRegulationDone}
+      />
+    );
+  }
+
+  if (phase === "time-estimate" && !estimate && !skippedEstimate) {
+    return (
+      <TimeEstimatePrompt
+        taskId={initialTask.id}
+        taskTitle={initialTask.title}
+        stepCount={steps.length}
+        onEstimateSet={handleEstimateSet}
+        onSkip={handleEstimateSkip}
       />
     );
   }
@@ -230,9 +291,17 @@ export default function TaskStepController({
   }
 
   if (phase === "celebration" || (!currentStep && phase === "steps")) {
+    const timeData =
+      initialEstimate?.actualMinutes != null
+        ? {
+            estimateMinutes: initialEstimate.estimateMinutes,
+            actualMinutes: initialEstimate.actualMinutes,
+          }
+        : null;
     return (
       <Celebration
         taskTitle={initialTask.title}
+        timeEstimate={timeData}
         moodBefore={moodBefore}
         moodAfter={moodAfter}
       />
@@ -244,6 +313,13 @@ export default function TaskStepController({
       <h2 className="text-lg font-medium text-stone-600 text-center mb-8">
         {initialTask.title}
       </h2>
+
+      {estimate ? (
+        <AmbientTimer
+          startedAt={estimate.startedAt}
+          estimateMinutes={estimate.estimateMinutes}
+        />
+      ) : null}
 
       {focusRoom && (
         <FocusRoomPresenceBar
@@ -257,9 +333,7 @@ export default function TaskStepController({
       </div>
 
       {error && (
-        <p role="alert" className="text-red-500 text-sm text-center mb-4">
-          {error}
-        </p>
+        <ErrorAlert message={error} className="text-center mb-4" />
       )}
 
       <StepCard

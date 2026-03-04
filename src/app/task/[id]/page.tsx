@@ -25,6 +25,7 @@ export default async function TaskPage({
       where: { id, userId: session.user.id },
       include: {
         steps: { orderBy: { orderIndex: "asc" } },
+        timeEstimate: true,
         moodCheckIns: {
           select: { mood: true, timing: true },
           orderBy: { createdAt: "asc" },
@@ -37,6 +38,15 @@ export default async function TaskPage({
   if (!task) {
     notFound();
   }
+
+  const timeEstimate = task.timeEstimate
+    ? {
+        estimateMinutes: task.timeEstimate.estimateMinutes,
+        startedAt: task.timeEstimate.startedAt.toISOString(),
+        completedAt: task.timeEstimate.completedAt?.toISOString() ?? null,
+        actualMinutes: task.timeEstimate.actualMinutes,
+      }
+    : null;
 
   return (
     <TaskStepController
@@ -53,6 +63,7 @@ export default async function TaskPage({
           timing: m.timing,
         })),
       }}
+      timeEstimate={timeEstimate}
       initialFocusCount={focusCount}
     />
   );

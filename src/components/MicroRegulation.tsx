@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 
+import { type DistressedMood } from "@/lib/moods";
+
 interface MicroRegulationProps {
-  mood: "anxious" | "frustrated" | "tired";
+  mood: DistressedMood;
   onComplete: () => void;
   onSkip: () => void;
 }

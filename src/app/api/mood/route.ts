@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { VALID_MOOD_KEYS } from "@/lib/moods";
+import { requireSession, findOwnedTask } from "@/lib/api-helpers";
 
-const VALID_MOODS = ["calm", "excited", "anxious", "frustrated", "tired"];
 const VALID_TIMINGS = ["before", "after"];
 
 export async function POST(request: Request) {
   try {
-    const [session, body] = await Promise.all([
-      auth(),
+    const [auth, body] = await Promise.all([
+      requireSession(),
       request.json().catch(() => null),
     ]);
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (auth.error) return auth.error;
 
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json(
@@ -33,7 +31,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!VALID_MOODS.includes(mood)) {
+    if (!VALID_MOOD_KEYS.includes(mood)) {
       return NextResponse.json(
         { error: "Invalid mood value." },
         { status: 400 }
@@ -47,24 +45,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify task ownership
-    const task = await prisma.task.findUnique({
-      where: { id: taskId, userId: session.user.id },
-      select: { id: true },
-    });
-
+    const task = await findOwnedTask(taskId, auth.userId);
     if (!task) {
       return NextResponse.json({ error: "Task not found." }, { status: 404 });
     }
 
     const checkIn = await prisma.moodCheckIn.upsert({
       where: {
-        taskId_userId_timing: { taskId, userId: session.user.id, timing },
+        taskId_userId_timing: { taskId, userId: auth.userId, timing },
       },
       update: { mood },
       create: {
         taskId,
-        userId: session.user.id,
+        userId: auth.userId,
         mood,
         timing,
       },

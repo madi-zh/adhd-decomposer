@@ -25,3 +25,8 @@ export const MOODS: Mood[] = [
 export const MOOD_MAP: Record<string, Mood> = Object.fromEntries(
   MOODS.map((m) => [m.key, m])
 );
+
+export const VALID_MOOD_KEYS = MOODS.map((m) => m.key);
+
+export const DISTRESSED_MOODS = ["anxious", "frustrated", "tired"] as const;
+export type DistressedMood = (typeof DISTRESSED_MOODS)[number];

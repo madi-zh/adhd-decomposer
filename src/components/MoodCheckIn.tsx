@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MOODS } from "@/lib/moods";
+import ErrorAlert from "@/components/ErrorAlert";
 
 interface MoodCheckInProps {
   taskId: string;
@@ -50,9 +51,7 @@ export default function MoodCheckIn({
       </h2>
 
       {saveError && (
-        <p role="alert" className="text-red-500 text-sm text-center mb-4">
-          Could not save. Please try again.
-        </p>
+        <ErrorAlert message="Could not save. Please try again." className="text-center mb-4" />
       )}
 
       <div role="group" aria-label="Mood selection" className="flex gap-3 flex-wrap justify-center">

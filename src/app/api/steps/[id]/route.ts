@@ -41,13 +41,25 @@ export async function PATCH(
       });
 
       if (remainingSteps === 0) {
-        await prisma.task.update({
-          where: { id: updatedStep.taskId },
-          data: {
-            status: "completed",
-            completedAt: new Date(),
-          },
-        });
+        const now = new Date();
+        const [, estimate] = await Promise.all([
+          prisma.task.update({
+            where: { id: updatedStep.taskId },
+            data: { status: "completed", completedAt: now },
+          }),
+          prisma.timeEstimate.findUnique({
+            where: { taskId: updatedStep.taskId },
+          }),
+        ]);
+        if (estimate && !estimate.completedAt) {
+          const actual = Math.round(
+            (now.getTime() - estimate.startedAt.getTime()) / 60000
+          );
+          await prisma.timeEstimate.update({
+            where: { id: estimate.id },
+            data: { completedAt: now, actualMinutes: actual },
+          });
+        }
       }
     });
 

@@ -68,6 +68,11 @@ prisma/
 - `AUTH_TRUST_HOST` — Set to `true` for local development
 - `ANTHROPIC_API_KEY` — Claude API key for task decomposition
 
-## No Test Framework
+## Testing
 
-There is currently no test suite configured. Rely on `npm run lint` and `npm run build` to verify changes.
+- **Framework**: Vitest 4 + React Testing Library
+- **Run**: `npm test` (single run) or `npm run test:watch` (watch mode)
+- **Config**: `vitest.config.ts` — jsdom environment, `@/` path alias, setup file
+- **Setup**: `tests/setup.ts` — global mocks for auth, api-helpers, logger, Anthropic SDK, Resend
+- **Helpers**: `tests/helpers.ts` — in-memory SQLite Prisma client, factory functions, request builders
+- **Structure**: `tests/lib/` for utility tests, `tests/api/` for API route tests
