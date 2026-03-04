@@ -69,9 +69,7 @@ export default function MoodCheckIn({
                        disabled:opacity-50 disabled:cursor-not-allowed
                        data-[selected]:border-amber-500 data-[selected]:bg-amber-50 data-[selected]:scale-105"
           >
-            <span className="text-3xl" aria-hidden="true">
-              {mood.emoji}
-            </span>
+            <mood.icon className={mood.color} size={32} aria-hidden="true" />
             <span className="text-xs text-stone-600">{mood.label}</span>
           </button>
         ))}
