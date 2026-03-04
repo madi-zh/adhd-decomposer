@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 
-export default function SettingsError({ reset }: { error: Error; reset: () => void }) {
+export default function SettingsError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
-    <div className="flex flex-col items-center pt-24 text-center">
+    <div role="alert" className="flex flex-col items-center pt-24 text-center">
       <h2 className="text-xl font-semibold text-stone-700 mb-2">
         Could not load settings
       </h2>

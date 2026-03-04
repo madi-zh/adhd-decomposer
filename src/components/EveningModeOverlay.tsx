@@ -19,8 +19,7 @@ function isPastCutoffTime(cutoffHour: number, cutoffMin: number): boolean {
 
   if (currentMinutes < cutoffMinutes) return false;
 
-  const snoozedUntil =
-    typeof window !== "undefined" ? localStorage.getItem(SNOOZE_KEY) : null;
+  const snoozedUntil = localStorage.getItem(SNOOZE_KEY);
   if (snoozedUntil && Date.now() < parseInt(snoozedUntil, 10)) return false;
 
   return true;
@@ -37,11 +36,12 @@ export default function EveningModeOverlay({
   );
 
   useEffect(() => {
+    if (isPastCutoff) return; // Already triggered, no need to poll
     const interval = setInterval(() => {
       setIsPastCutoff(isPastCutoffTime(cutoffHour, cutoffMin));
     }, 60000);
     return () => clearInterval(interval);
-  }, [cutoffHour, cutoffMin]);
+  }, [cutoffHour, cutoffMin, isPastCutoff]);
 
   function handleSnooze() {
     localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_DURATION_MS));

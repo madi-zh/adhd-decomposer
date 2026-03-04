@@ -1,28 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
+
+const SETTINGS_SELECT = {
+  eveningCutoffHour: true,
+  eveningCutoffMin: true,
+  enableEveningMode: true,
+  enableFocusTimer: true,
+} as const;
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (auth.error) return auth.error;
 
-    const settings = await prisma.userSettings.upsert({
-      where: { userId: session.user.id },
-      update: {},
-      create: { userId: session.user.id },
-      select: {
-        eveningCutoffHour: true,
-        eveningCutoffMin: true,
-        enableEveningMode: true,
-        enableFocusTimer: true,
-      },
+    const settings = await prisma.userSettings.findUnique({
+      where: { userId: auth.userId },
+      select: SETTINGS_SELECT,
     });
 
-    return NextResponse.json(settings);
-  } catch {
+    return NextResponse.json(settings ?? {
+      eveningCutoffHour: 23,
+      eveningCutoffMin: 0,
+      enableEveningMode: false,
+      enableFocusTimer: true,
+    });
+  } catch (err) {
+    logger.error({ err, route: "GET /api/user/settings" }, "Failed to fetch settings");
     return NextResponse.json(
       { error: "Failed to fetch settings." },
       { status: 500 }
@@ -32,9 +37,14 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   try {
-    const [session, body] = await Promise.all([auth(), request.json()]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const [auth, body] = await Promise.all([
+      requireSession(),
+      request.json().catch(() => null),
+    ]);
+    if (auth.error) return auth.error;
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
 
     const { eveningCutoffHour, eveningCutoffMin, enableEveningMode, enableFocusTimer } = body;
@@ -53,20 +63,20 @@ export async function PATCH(request: Request) {
       data.enableFocusTimer = enableFocusTimer;
     }
 
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: "No valid fields provided." }, { status: 400 });
+    }
+
     const settings = await prisma.userSettings.upsert({
-      where: { userId: session.user.id },
+      where: { userId: auth.userId },
       update: data,
-      create: { userId: session.user.id, ...data },
-      select: {
-        eveningCutoffHour: true,
-        eveningCutoffMin: true,
-        enableEveningMode: true,
-        enableFocusTimer: true,
-      },
+      create: { userId: auth.userId, ...data },
+      select: SETTINGS_SELECT,
     });
 
     return NextResponse.json(settings);
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "PATCH /api/user/settings" }, "Failed to update settings");
     return NextResponse.json(
       { error: "Failed to update settings." },
       { status: 500 }

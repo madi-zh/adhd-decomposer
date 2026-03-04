@@ -286,10 +286,14 @@ export default function TaskStepController({
     setPhase("celebration");
   }, []);
 
+  const handleEveningDismiss = useCallback(() => {
+    setEveningDismissed(true);
+  }, []);
+
   async function handleStepComplete() {
     if (isCompleting || !currentStep) return;
     const activeStep = currentStep;
-    const isLastStep = steps.filter((s) => !s.isCompleted).length === 1;
+    const isLastStep = steps.length - completedCount === 1;
 
     setIsCompleting(true);
     setError("");
@@ -462,7 +466,7 @@ export default function TaskStepController({
         <EveningModeOverlay
           cutoffHour={userSettings.eveningCutoffHour}
           cutoffMin={userSettings.eveningCutoffMin}
-          onDismiss={() => setEveningDismissed(true)}
+          onDismiss={handleEveningDismiss}
         />
       )}
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ErrorAlert from "@/components/ErrorAlert";
 
 interface FocusContractProps {
   taskId: string;
@@ -119,9 +120,7 @@ export default function FocusContract({
       )}
 
       {error && (
-        <p role="alert" className="text-red-500 text-sm text-center mb-4">
-          {error}
-        </p>
+        <ErrorAlert message={error} className="text-center mb-4" />
       )}
 
       <button

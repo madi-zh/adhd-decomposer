@@ -40,8 +40,9 @@ export default function FocusTimer({
   startedAt,
 }: FocusTimerProps) {
   const router = useRouter();
-  const limitSeconds = timeLimitMin * 60;
+  const limitSeconds = useMemo(() => timeLimitMin * 60, [timeLimitMin]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const chimeFiredRef = useRef(false);
   const nudgedLevelsRef = useRef<Set<number>>(new Set());
 
   const [elapsedSeconds, setElapsedSeconds] = useState(() => {
@@ -56,11 +57,18 @@ export default function FocusTimer({
       ? null
       : fiveMoreMinEnd;
 
-  // Derive nudge level from current state (no effect needed)
-  const nudgeLevel = useMemo(
-    () => computeNudgeLevel(elapsedSeconds, limitSeconds, effectiveFiveMoreMinEnd),
-    [elapsedSeconds, limitSeconds, effectiveFiveMoreMinEnd]
-  );
+  const nudgeLevel = computeNudgeLevel(elapsedSeconds, limitSeconds, effectiveFiveMoreMinEnd);
+
+  // Preload audio on mount
+  useEffect(() => {
+    try {
+      audioRef.current = new Audio("/sounds/chime.mp3");
+      audioRef.current.volume = 0.5;
+      audioRef.current.load();
+    } catch {
+      // Audio not supported
+    }
+  }, []);
 
   // Tick every second
   useEffect(() => {
@@ -84,16 +92,11 @@ export default function FocusTimer({
     [sessionId]
   );
 
-  // Play chime at nudge level 2
+  // Play chime once when nudge reaches level 2
   useEffect(() => {
-    if (nudgeLevel >= 2 && !audioRef.current) {
-      try {
-        audioRef.current = new Audio("/sounds/chime.mp3");
-        audioRef.current.volume = 0.5;
-        audioRef.current.play().catch(() => {});
-      } catch {
-        // Audio not supported
-      }
+    if (nudgeLevel >= 2 && !chimeFiredRef.current && audioRef.current) {
+      chimeFiredRef.current = true;
+      audioRef.current.play().catch(() => {});
     }
   }, [nudgeLevel]);
 
@@ -110,7 +113,7 @@ export default function FocusTimer({
         body: JSON.stringify({ action: "end" }),
       });
     } catch {
-      // Best effort
+      // Best effort — session end is non-critical telemetry
     }
     router.push("/");
   }

@@ -32,10 +32,8 @@ export default async function TaskPage({
         },
       },
     }),
-    prisma.userSettings.upsert({
+    prisma.userSettings.findUnique({
       where: { userId: session.user.id },
-      update: {},
-      create: { userId: session.user.id },
       select: {
         eveningCutoffHour: true,
         eveningCutoffMin: true,
@@ -81,7 +79,7 @@ export default async function TaskPage({
       }}
       timeEstimate={timeEstimate}
       initialFocusCount={focusCount}
-      userSettings={userSettings}
+      userSettings={userSettings ?? undefined}
       focusSession={
         activeFocusSession
           ? {

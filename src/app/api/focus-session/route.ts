@@ -1,29 +1,35 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { requireSession, findOwnedTask } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 export async function POST(request: Request) {
   try {
-    const [session, body] = await Promise.all([auth(), request.json()]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const [auth, body] = await Promise.all([
+      requireSession(),
+      request.json().catch(() => null),
+    ]);
+    if (auth.error) return auth.error;
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
 
     const { taskId, timeLimitMin } = body;
 
-    if (!taskId || typeof timeLimitMin !== "number" || timeLimitMin < 5 || timeLimitMin > 180) {
+    if (
+      typeof taskId !== "string" ||
+      typeof timeLimitMin !== "number" ||
+      timeLimitMin < 5 ||
+      timeLimitMin > 180
+    ) {
       return NextResponse.json(
         { error: "taskId required, timeLimitMin must be 5-180." },
         { status: 400 }
       );
     }
 
-    // Verify the task belongs to this user
-    const task = await prisma.task.findUnique({
-      where: { id: taskId, userId: session.user.id },
-      select: { id: true },
-    });
-
+    const task = await findOwnedTask(taskId, auth.userId);
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
@@ -31,7 +37,7 @@ export async function POST(request: Request) {
     const focusSession = await prisma.focusSession.create({
       data: {
         taskId,
-        userId: session.user.id,
+        userId: auth.userId,
         timeLimitMin,
         startedAt: new Date(),
       },
@@ -44,7 +50,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(focusSession, { status: 201 });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/focus-session" }, "Failed to create focus session");
     return NextResponse.json(
       { error: "Failed to create focus session." },
       { status: 500 }

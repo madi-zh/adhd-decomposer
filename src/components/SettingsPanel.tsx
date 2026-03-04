@@ -17,11 +17,11 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
   const [cutoffHour, setCutoffHour] = useState(initial.eveningCutoffHour);
   const [cutoffMin, setCutoffMin] = useState(initial.eveningCutoffMin);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [saveResult, setSaveResult] = useState<{ message: string; isError: boolean } | null>(null);
 
   async function handleSave() {
     setIsSaving(true);
-    setMessage("");
+    setSaveResult(null);
 
     try {
       const res = await fetch("/api/user/settings", {
@@ -36,9 +36,9 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
       });
 
       if (!res.ok) throw new Error();
-      setMessage("Settings saved");
+      setSaveResult({ message: "Settings saved", isError: false });
     } catch {
-      setMessage("Could not save settings. Please try again.");
+      setSaveResult({ message: "Could not save settings. Please try again.", isError: true });
     } finally {
       setIsSaving(false);
     }
@@ -154,15 +154,13 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
           >
             {isSaving ? "Saving..." : "Save"}
           </button>
-          {message && (
+          {saveResult && (
             <p
               className={`text-sm ${
-                message.includes("saved")
-                  ? "text-emerald-600"
-                  : "text-red-500"
+                saveResult.isError ? "text-red-500" : "text-emerald-600"
               }`}
             >
-              {message}
+              {saveResult.message}
             </p>
           )}
         </div>
