@@ -1,26 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { requireSession, findOwnedTask } from "@/lib/api-helpers";
+import { MIN_ESTIMATE_MINUTES, MAX_ESTIMATE_MINUTES } from "@/lib/validation";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const [session, { id }, body] = await Promise.all([
-      auth(),
+    const [auth, { id }, body] = await Promise.all([
+      requireSession(),
       params,
       request.json(),
     ]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (auth.error) return auth.error;
 
-    const task = await prisma.task.findUnique({
-      where: { id, userId: session.user.id },
-    });
-
+    const task = await findOwnedTask(id, auth.userId);
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
@@ -29,11 +25,11 @@ export async function POST(
     if (
       typeof estimateMinutes !== "number" ||
       !Number.isInteger(estimateMinutes) ||
-      estimateMinutes < 1 ||
-      estimateMinutes > 480
+      estimateMinutes < MIN_ESTIMATE_MINUTES ||
+      estimateMinutes > MAX_ESTIMATE_MINUTES
     ) {
       return NextResponse.json(
-        { error: "estimateMinutes must be an integer between 1 and 480" },
+        { error: `estimateMinutes must be an integer between ${MIN_ESTIMATE_MINUTES} and ${MAX_ESTIMATE_MINUTES}` },
         { status: 400 }
       );
     }
@@ -66,15 +62,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const [session, { id }] = await Promise.all([auth(), params]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const [auth, { id }] = await Promise.all([requireSession(), params]);
+    if (auth.error) return auth.error;
 
-    const task = await prisma.task.findUnique({
-      where: { id, userId: session.user.id },
-    });
-
+    const task = await findOwnedTask(id, auth.userId);
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }

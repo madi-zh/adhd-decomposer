@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ErrorAlert from "@/components/ErrorAlert";
+import { MIN_ESTIMATE_MINUTES, MAX_ESTIMATE_MINUTES } from "@/lib/validation";
 
 interface TimeEstimatePromptProps {
   taskId: string;
@@ -41,8 +43,8 @@ export default function TimeEstimatePrompt({
 
   async function handleSubmit() {
     const value = typeof minutes === "number" ? minutes : 0;
-    if (value < 1 || value > 480) {
-      setError("Enter a time between 1 and 480 minutes.");
+    if (value < MIN_ESTIMATE_MINUTES || value > MAX_ESTIMATE_MINUTES) {
+      setError(`Enter a time between ${MIN_ESTIMATE_MINUTES} and ${MAX_ESTIMATE_MINUTES} minutes.`);
       return;
     }
 
@@ -94,8 +96,8 @@ export default function TimeEstimatePrompt({
       <div className="mb-6">
         <input
           type="number"
-          min={1}
-          max={480}
+          min={MIN_ESTIMATE_MINUTES}
+          max={MAX_ESTIMATE_MINUTES}
           value={minutes}
           onChange={handleInputChange}
           placeholder="min"
@@ -104,9 +106,7 @@ export default function TimeEstimatePrompt({
       </div>
 
       {error && (
-        <p role="alert" className="text-red-500 text-sm mb-4">
-          {error}
-        </p>
+        <ErrorAlert message={error} className="mb-4" />
       )}
 
       <button

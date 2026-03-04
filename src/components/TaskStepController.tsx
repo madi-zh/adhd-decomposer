@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
+import ErrorAlert from "@/components/ErrorAlert";
+import { DISTRESSED_MOODS, type DistressedMood } from "@/lib/moods";
 
 const Celebration = dynamic(() => import("@/components/Celebration"), {
   ssr: false,
@@ -65,8 +67,6 @@ interface TimeEstimateData {
 }
 
 type Phase = "focus-room-invite" | "mood-before" | "regulation" | "time-estimate" | "steps" | "mood-after" | "celebration";
-
-const DISTRESSED_MOODS = ["anxious", "frustrated", "tired"];
 
 function getInitialPhase(
   moodCheckIns?: ExistingMoodCheckIn[],
@@ -162,7 +162,7 @@ export default function TaskStepController({
 
   const handleMoodBeforeComplete = useCallback((mood: string) => {
     setMoodBefore(mood);
-    if (DISTRESSED_MOODS.includes(mood)) {
+    if ((DISTRESSED_MOODS as readonly string[]).includes(mood)) {
       setPhase("regulation");
     } else {
       setPhase("time-estimate");
@@ -257,10 +257,10 @@ export default function TaskStepController({
     );
   }
 
-  if (phase === "regulation" && moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
+  if (phase === "regulation" && moodBefore && (DISTRESSED_MOODS as readonly string[]).includes(moodBefore)) {
     return (
       <MicroRegulation
-        mood={moodBefore as "anxious" | "frustrated" | "tired"}
+        mood={moodBefore as DistressedMood}
         onComplete={handleRegulationDone}
         onSkip={handleRegulationDone}
       />
@@ -333,9 +333,7 @@ export default function TaskStepController({
       </div>
 
       {error && (
-        <p role="alert" className="text-red-500 text-sm text-center mb-4">
-          {error}
-        </p>
+        <ErrorAlert message={error} className="text-center mb-4" />
       )}
 
       <StepCard
