@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { MOOD_EMOJIS } from "@/lib/moods";
+import { MOOD_MAP } from "@/lib/moods";
+import { PartyPopper, ArrowRight } from "lucide-react";
 
 interface CelebrationProps {
   taskTitle: string;
@@ -44,9 +45,12 @@ export default function Celebration({ taskTitle, moodBefore, moodAfter }: Celebr
     });
   }, []);
 
+  const BeforeIcon = moodBefore ? MOOD_MAP[moodBefore]?.icon : null;
+  const AfterIcon = moodAfter ? MOOD_MAP[moodAfter]?.icon : null;
+
   return (
     <div className="flex flex-col items-center justify-center pt-16 text-center">
-      <div className="text-6xl mb-6" role="img" aria-label="Party popper">&#127881;</div>
+      <div className="mb-6" role="img" aria-label="Party popper"><PartyPopper size={64} className="text-amber-500" /></div>
       <h1 className="text-3xl font-bold text-stone-800 mb-2">You did it!</h1>
       <p className="text-lg text-stone-500 mb-2">
         You finished every single step.
@@ -58,9 +62,17 @@ export default function Celebration({ taskTitle, moodBefore, moodAfter }: Celebr
           className="flex items-center gap-2 bg-stone-50 rounded-full px-4 py-2 mb-6"
           aria-label={`Mood before: ${moodBefore}. Mood after: ${moodAfter}.`}
         >
-          <span aria-hidden="true">{MOOD_EMOJIS[moodBefore] ?? moodBefore}</span>
-          <span aria-hidden="true" className="text-stone-300">&rarr;</span>
-          <span aria-hidden="true">{MOOD_EMOJIS[moodAfter] ?? moodAfter}</span>
+          {BeforeIcon ? (
+            <BeforeIcon className={MOOD_MAP[moodBefore!].color} size={20} aria-hidden="true" />
+          ) : (
+            <span aria-hidden="true">{moodBefore}</span>
+          )}
+          <ArrowRight size={16} className="text-stone-300" aria-hidden="true" />
+          {AfterIcon ? (
+            <AfterIcon className={MOOD_MAP[moodAfter!].color} size={20} aria-hidden="true" />
+          ) : (
+            <span aria-hidden="true">{moodAfter}</span>
+          )}
         </div>
       )}
 
