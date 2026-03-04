@@ -3,6 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import TaskStepController from "@/components/TaskStepController";
 
+async function getActiveFocusCount() {
+  const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000);
+  return prisma.focusRoomPresence.count({
+    where: { lastPingAt: { gt: twoMinAgo } },
+  });
+}
+
 export default async function TaskPage({
   params,
 }: {
@@ -13,10 +20,17 @@ export default async function TaskPage({
     redirect("/login");
   }
 
-  const [task, userSettings, activeFocusSession] = await Promise.all([
+  const [task, userSettings, activeFocusSession, focusCount] = await Promise.all([
     prisma.task.findUnique({
       where: { id, userId: session.user.id },
-      include: { steps: { orderBy: { orderIndex: "asc" } } },
+      include: {
+        steps: { orderBy: { orderIndex: "asc" } },
+        timeEstimate: true,
+        moodCheckIns: {
+          select: { mood: true, timing: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
     }),
     prisma.userSettings.upsert({
       where: { userId: session.user.id },
@@ -34,11 +48,21 @@ export default async function TaskPage({
       orderBy: { createdAt: "desc" },
       select: { id: true, timeLimitMin: true, startedAt: true },
     }),
+    getActiveFocusCount(),
   ]);
 
   if (!task) {
     notFound();
   }
+
+  const timeEstimate = task.timeEstimate
+    ? {
+        estimateMinutes: task.timeEstimate.estimateMinutes,
+        startedAt: task.timeEstimate.startedAt.toISOString(),
+        completedAt: task.timeEstimate.completedAt?.toISOString() ?? null,
+        actualMinutes: task.timeEstimate.actualMinutes,
+      }
+    : null;
 
   return (
     <TaskStepController
@@ -50,7 +74,13 @@ export default async function TaskPage({
           content: s.content,
           isCompleted: s.isCompleted,
         })),
+        moodCheckIns: task.moodCheckIns.map((m) => ({
+          mood: m.mood,
+          timing: m.timing,
+        })),
       }}
+      timeEstimate={timeEstimate}
+      initialFocusCount={focusCount}
       userSettings={userSettings}
       focusSession={
         activeFocusSession
