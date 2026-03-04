@@ -1,5 +1,7 @@
 "use client";
 
+import { Users } from "lucide-react";
+
 interface FocusRoomInviteProps {
   activeCount: number;
   onJoin: () => void;
@@ -13,8 +15,8 @@ export default function FocusRoomInvite({
 }: FocusRoomInviteProps) {
   return (
     <div className="flex flex-col items-center text-center pt-12 px-4">
-      <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center text-3xl mb-6">
-        👥
+      <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
+        <Users size={32} className="text-emerald-500" aria-hidden="true" />
       </div>
 
       <h2 className="text-xl font-semibold text-stone-800 mb-2">

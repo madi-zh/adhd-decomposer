@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
@@ -15,86 +15,143 @@ const FocusRoomPresenceBar = dynamic(
   { ssr: false }
 );
 
+const MicroRegulation = dynamic(
+  () => import("@/components/MicroRegulation"),
+  { ssr: false }
+);
+
+const MoodCheckIn = dynamic(
+  () => import("@/components/MoodCheckIn"),
+  { ssr: false }
+);
+
 interface Step {
   id: string;
   content: string;
   isCompleted: boolean;
 }
 
-interface Task {
-  title: string;
-  steps: Step[];
+interface ExistingMoodCheckIn {
+  mood: string;
+  timing: string;
 }
 
-type Phase = "focus-room-invite" | "steps";
+interface Task {
+  id: string;
+  title: string;
+  steps: Step[];
+  moodCheckIns?: ExistingMoodCheckIn[];
+}
+
+type Phase = "focus-room-invite" | "mood-before" | "regulation" | "steps" | "mood-after" | "celebration";
+
+const DISTRESSED_MOODS = ["anxious", "frustrated", "tired"];
+
+function getInitialPhase(moodCheckIns?: ExistingMoodCheckIn[], allStepsComplete?: boolean): Phase {
+  const hasBefore = moodCheckIns?.some((m) => m.timing === "before");
+  const hasAfter = moodCheckIns?.some((m) => m.timing === "after");
+
+  if (allStepsComplete) {
+    return hasAfter ? "celebration" : "mood-after";
+  }
+  // If they already did a before check-in, go straight to steps (skip focus room invite too)
+  if (hasBefore) return "steps";
+  // Otherwise start with focus room invite
+  return "focus-room-invite";
+}
 
 export default function TaskStepController({
   task: initialTask,
   initialFocusCount = 0,
-  taskId,
 }: {
   task: Task;
   initialFocusCount?: number;
-  taskId?: string;
 }) {
   const [steps, setSteps] = useState(initialTask.steps);
   const [isCompleting, setIsCompleting] = useState(false);
   const [error, setError] = useState("");
-  const [phase, setPhase] = useState<Phase>("focus-room-invite");
   const [focusRoom, setFocusRoom] = useState<{ presenceId: string } | null>(
     null
   );
 
-  let completedCount = 0;
-  let currentStep: Step | undefined;
+  const allStepsComplete = steps.every((s) => s.isCompleted);
+  const existingBeforeMood = initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null;
 
-  for (const s of steps) {
-    if (s.isCompleted) {
-      completedCount++;
-    } else if (!currentStep) {
-      currentStep = s;
+  const [phase, setPhase] = useState<Phase>(() =>
+    getInitialPhase(initialTask.moodCheckIns, allStepsComplete)
+  );
+  const [moodBefore, setMoodBefore] = useState<string | null>(existingBeforeMood);
+  const [moodAfter, setMoodAfter] = useState<string | null>(
+    initialTask.moodCheckIns?.find((m) => m.timing === "after")?.mood ?? null
+  );
+
+  const { completedCount, currentStep } = useMemo(() => {
+    let completed = 0;
+    let current: Step | undefined;
+
+    for (const s of steps) {
+      if (s.isCompleted) {
+        completed++;
+      } else if (!current) {
+        current = s;
+      }
     }
-  }
+    return { completedCount: completed, currentStep: current };
+  }, [steps]);
 
   const handleJoinFocusRoom = useCallback(async () => {
     try {
       const res = await fetch("/api/focus-room/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId }),
+        body: JSON.stringify({ taskId: initialTask.id }),
       });
       if (res.ok) {
         const data = await res.json();
         setFocusRoom({ presenceId: data.presenceId });
       }
     } catch {
-      // If join fails, just proceed to steps
+      // If join fails, just proceed
     }
-    setPhase("steps");
-  }, [taskId]);
+    setPhase("mood-before");
+  }, [initialTask.id]);
 
   const handleSkipFocusRoom = useCallback(() => {
+    setPhase("mood-before");
+  }, []);
+
+  const handleMoodBeforeComplete = useCallback((mood: string) => {
+    setMoodBefore(mood);
+    if (DISTRESSED_MOODS.includes(mood)) {
+      setPhase("regulation");
+    } else {
+      setPhase("steps");
+    }
+  }, []);
+
+  const handleMoodBeforeSkip = useCallback(() => {
     setPhase("steps");
   }, []);
 
-  if (!currentStep) {
-    return <Celebration taskTitle={initialTask.title} />;
-  }
+  const handleRegulationDone = useCallback(() => {
+    setPhase("steps");
+  }, []);
 
-  if (phase === "focus-room-invite") {
-    return (
-      <FocusRoomInvite
-        activeCount={initialFocusCount}
-        onJoin={handleJoinFocusRoom}
-        onSkip={handleSkipFocusRoom}
-      />
-    );
-  }
+  const handleMoodAfterComplete = useCallback((mood: string) => {
+    setMoodAfter(mood);
+    setPhase("celebration");
+  }, []);
 
-  const activeStep = currentStep;
+  const handleMoodAfterSkip = useCallback(() => {
+    setPhase("celebration");
+  }, []);
 
-  async function handleComplete() {
-    if (isCompleting) return;
+  async function handleStepComplete() {
+    if (isCompleting || !currentStep) return;
+    const activeStep = currentStep;
+    // Capture before optimistic update — if only 1 incomplete, this is the last step
+    const isLastStep = steps.filter((s) => !s.isCompleted).length === 1;
+
     setIsCompleting(true);
     setError("");
 
@@ -104,6 +161,10 @@ export default function TaskStepController({
         s.id === activeStep.id ? { ...s, isCompleted: true } : s
       )
     );
+
+    if (isLastStep) {
+      setPhase("mood-after");
+    }
 
     try {
       const res = await fetch(`/api/steps/${activeStep.id}`, {
@@ -117,10 +178,65 @@ export default function TaskStepController({
           s.id === activeStep.id ? { ...s, isCompleted: false } : s
         )
       );
+      if (isLastStep) {
+        setPhase("steps");
+      }
       setError("Could not save progress. Please try again.");
     } finally {
       setIsCompleting(false);
     }
+  }
+
+  if (phase === "focus-room-invite") {
+    return (
+      <FocusRoomInvite
+        activeCount={initialFocusCount}
+        onJoin={handleJoinFocusRoom}
+        onSkip={handleSkipFocusRoom}
+      />
+    );
+  }
+
+  if (phase === "mood-before") {
+    return (
+      <MoodCheckIn
+        taskId={initialTask.id}
+        timing="before"
+        onComplete={handleMoodBeforeComplete}
+        onSkip={handleMoodBeforeSkip}
+      />
+    );
+  }
+
+  if (phase === "regulation" && moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
+    return (
+      <MicroRegulation
+        mood={moodBefore as "anxious" | "frustrated" | "tired"}
+        onComplete={handleRegulationDone}
+        onSkip={handleRegulationDone}
+      />
+    );
+  }
+
+  if (phase === "mood-after") {
+    return (
+      <MoodCheckIn
+        taskId={initialTask.id}
+        timing="after"
+        onComplete={handleMoodAfterComplete}
+        onSkip={handleMoodAfterSkip}
+      />
+    );
+  }
+
+  if (phase === "celebration" || (!currentStep && phase === "steps")) {
+    return (
+      <Celebration
+        taskTitle={initialTask.title}
+        moodBefore={moodBefore}
+        moodAfter={moodAfter}
+      />
+    );
   }
 
   return (
@@ -132,7 +248,7 @@ export default function TaskStepController({
       {focusRoom && (
         <FocusRoomPresenceBar
           presenceId={focusRoom.presenceId}
-          currentStepContent={activeStep.content.slice(0, 50)}
+          currentStepContent={currentStep!.content.slice(0, 50)}
         />
       )}
 
@@ -147,10 +263,10 @@ export default function TaskStepController({
       )}
 
       <StepCard
-        content={activeStep.content}
+        content={currentStep!.content}
         stepNumber={completedCount + 1}
         total={steps.length}
-        onComplete={handleComplete}
+        onComplete={handleStepComplete}
         isCompleting={isCompleting}
       />
     </div>

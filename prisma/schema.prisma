@@ -8,18 +8,19 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
+  id             String         @id @default(cuid())
   name           String?
-  email          String    @unique
+  email          String         @unique
   emailVerified  DateTime?
   hashedPassword String?
   image          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   accounts       Account[]
   sessions       Session[]
   tasks              Task[]
   focusRoomPresence  FocusRoomPresence[]
+  moodCheckIns       MoodCheckIn[]
 }
 
 model Account {
@@ -67,6 +68,7 @@ model Task {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   steps              Step[]
   focusRoomPresences FocusRoomPresence[]
+  moodCheckIns       MoodCheckIn[]
 }
 
 model Step {
@@ -92,4 +94,19 @@ model FocusRoomPresence {
 
   @@index([lastPingAt])
   @@index([userId])
+}
+
+model MoodCheckIn {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mood      String
+  timing    String
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId, timing])
+  @@index([userId, createdAt])
+  @@index([taskId])
 }
