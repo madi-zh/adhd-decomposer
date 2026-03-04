@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 interface AmbientTimerProps {
   startedAt: string;
@@ -17,8 +17,10 @@ export default function AmbientTimer({
   startedAt,
   estimateMinutes,
 }: AmbientTimerProps) {
+  const startTime = useMemo(() => new Date(startedAt).getTime(), [startedAt]);
+
   const [elapsedSeconds, setElapsedSeconds] = useState(() => {
-    return Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+    return Math.floor((Date.now() - startTime) / 1000);
   });
 
   const lastAnnouncedRef = useRef(0);
@@ -31,7 +33,6 @@ export default function AmbientTimer({
   }, []);
 
   useEffect(() => {
-    const startTime = new Date(startedAt).getTime();
     const interval = setInterval(() => {
       const now = Date.now();
       const elapsed = Math.floor((now - startTime) / 1000);
@@ -47,7 +48,7 @@ export default function AmbientTimer({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startedAt, announce]);
+  }, [startTime, announce]);
 
   const ratio = elapsedSeconds / (estimateMinutes * 60);
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 
 export async function POST(
   request: Request,
@@ -51,7 +52,8 @@ export async function POST(
       estimateMinutes: timeEstimate.estimateMinutes,
       startedAt: timeEstimate.startedAt.toISOString(),
     });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "POST /api/tasks/[id]/estimate" }, "Failed to save estimate");
     return NextResponse.json(
       { error: "Failed to save estimate." },
       { status: 500 }
@@ -92,7 +94,8 @@ export async function GET(
       completedAt: timeEstimate.completedAt?.toISOString() ?? null,
       actualMinutes: timeEstimate.actualMinutes,
     });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "GET /api/tasks/[id]/estimate" }, "Failed to load estimate");
     return NextResponse.json(
       { error: "Failed to load estimate." },
       { status: 500 }

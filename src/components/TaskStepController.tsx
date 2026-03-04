@@ -4,9 +4,6 @@ import { useState, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
-import TimeEstimatePrompt from "@/components/TimeEstimatePrompt";
-import AmbientTimer from "@/components/AmbientTimer";
-import FocusRoomInvite from "@/components/FocusRoomInvite";
 
 const Celebration = dynamic(() => import("@/components/Celebration"), {
   ssr: false,
@@ -24,6 +21,21 @@ const MicroRegulation = dynamic(
 
 const MoodCheckIn = dynamic(
   () => import("@/components/MoodCheckIn"),
+  { ssr: false }
+);
+
+const TimeEstimatePrompt = dynamic(
+  () => import("@/components/TimeEstimatePrompt"),
+  { ssr: false }
+);
+
+const AmbientTimer = dynamic(
+  () => import("@/components/AmbientTimer"),
+  { ssr: false }
+);
+
+const FocusRoomInvite = dynamic(
+  () => import("@/components/FocusRoomInvite"),
   { ssr: false }
 );
 
@@ -102,12 +114,12 @@ export default function TaskStepController({
   );
   const [skippedEstimate, setSkippedEstimate] = useState(false);
 
-  const allStepsComplete = steps.every((s) => s.isCompleted);
   const existingBeforeMood = initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null;
 
-  const [phase, setPhase] = useState<Phase>(() =>
-    getInitialPhase(initialTask.moodCheckIns, allStepsComplete, !!initialEstimate || false)
-  );
+  const [phase, setPhase] = useState<Phase>(() => {
+    const allComplete = initialTask.steps.every((s) => s.isCompleted);
+    return getInitialPhase(initialTask.moodCheckIns, allComplete, !!initialEstimate);
+  });
   const [moodBefore, setMoodBefore] = useState<string | null>(existingBeforeMood);
   const [moodAfter, setMoodAfter] = useState<string | null>(
     initialTask.moodCheckIns?.find((m) => m.timing === "after")?.mood ?? null
@@ -172,6 +184,16 @@ export default function TaskStepController({
 
   const handleMoodAfterSkip = useCallback(() => {
     setPhase("celebration");
+  }, []);
+
+  const handleEstimateSet = useCallback((estimateMinutes: number, startedAt: string) => {
+    setEstimate({ estimateMinutes, startedAt });
+    setPhase("steps");
+  }, []);
+
+  const handleEstimateSkip = useCallback(() => {
+    setSkippedEstimate(true);
+    setPhase("steps");
   }, []);
 
   async function handleStepComplete() {
@@ -251,21 +273,10 @@ export default function TaskStepController({
         taskId={initialTask.id}
         taskTitle={initialTask.title}
         stepCount={steps.length}
-        onEstimateSet={(estimateMinutes, startedAt) => {
-          setEstimate({ estimateMinutes, startedAt });
-          setPhase("steps");
-        }}
-        onSkip={() => {
-          setSkippedEstimate(true);
-          setPhase("steps");
-        }}
+        onEstimateSet={handleEstimateSet}
+        onSkip={handleEstimateSkip}
       />
     );
-  }
-
-  // Auto-advance past time-estimate if already handled
-  if (phase === "time-estimate" && (estimate || skippedEstimate)) {
-    setPhase("steps");
   }
 
   if (phase === "mood-after") {

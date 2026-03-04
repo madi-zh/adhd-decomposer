@@ -42,17 +42,15 @@ export async function PATCH(
 
       if (remainingSteps === 0) {
         const now = new Date();
-        await prisma.task.update({
-          where: { id: updatedStep.taskId },
-          data: {
-            status: "completed",
-            completedAt: now,
-          },
-        });
-
-        const estimate = await prisma.timeEstimate.findUnique({
-          where: { taskId: updatedStep.taskId },
-        });
+        const [, estimate] = await Promise.all([
+          prisma.task.update({
+            where: { id: updatedStep.taskId },
+            data: { status: "completed", completedAt: now },
+          }),
+          prisma.timeEstimate.findUnique({
+            where: { taskId: updatedStep.taskId },
+          }),
+        ]);
         if (estimate && !estimate.completedAt) {
           const actual = Math.round(
             (now.getTime() - estimate.startedAt.getTime()) / 60000

@@ -20,12 +20,10 @@ export default function TimeEstimatePrompt({
   onSkip,
 }: TimeEstimatePromptProps) {
   const [minutes, setMinutes] = useState<number | "">("");
-  const [selected, setSelected] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   function handleQuickPick(value: number) {
-    setSelected(value);
     setMinutes(value);
   }
 
@@ -33,13 +31,11 @@ export default function TimeEstimatePrompt({
     const raw = e.target.value;
     if (raw === "") {
       setMinutes("");
-      setSelected(null);
       return;
     }
     const num = parseInt(raw, 10);
     if (!isNaN(num) && num >= 0) {
       setMinutes(num);
-      setSelected(QUICK_PICKS.includes(num) ? num : null);
     }
   }
 
@@ -86,7 +82,7 @@ export default function TimeEstimatePrompt({
           <button
             key={value}
             type="button"
-            data-selected={selected === value}
+            data-selected={minutes === value}
             onClick={() => handleQuickPick(value)}
             className="px-4 py-2 border-2 border-stone-200 rounded-2xl text-stone-600 hover:border-amber-400 data-[selected=true]:border-amber-500 data-[selected=true]:bg-amber-50 transition-colors"
           >
