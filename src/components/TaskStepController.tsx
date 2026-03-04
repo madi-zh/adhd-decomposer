@@ -208,18 +208,14 @@ export default function TaskStepController({
     );
   }
 
-  if (phase === "regulation") {
-    if (moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
-      return (
-        <MicroRegulation
-          mood={moodBefore as "anxious" | "frustrated" | "tired"}
-          onComplete={handleRegulationDone}
-          onSkip={handleRegulationDone}
-        />
-      );
-    }
-    setPhase("steps");
-    return null;
+  if (phase === "regulation" && moodBefore && DISTRESSED_MOODS.includes(moodBefore)) {
+    return (
+      <MicroRegulation
+        mood={moodBefore as "anxious" | "frustrated" | "tired"}
+        onComplete={handleRegulationDone}
+        onSkip={handleRegulationDone}
+      />
+    );
   }
 
   if (phase === "mood-after") {
