@@ -7,17 +7,22 @@ interface DeadlinePickerProps {
   onDeadlineSet: (deadline: string) => void;
 }
 
-function getQuickPickDate(option: "today" | "tomorrow" | "week"): string {
+type QuickPickOption = "today" | "tomorrow" | "week";
+
+const QUICK_PICKS: { label: string; option: QuickPickOption }[] = [
+  { label: "Today", option: "today" },
+  { label: "Tomorrow", option: "tomorrow" },
+  { label: "This week", option: "week" },
+];
+
+function getQuickPickDate(option: QuickPickOption): string {
   const d = new Date();
-  if (option === "today") {
-    d.setHours(23, 59, 0, 0);
-  } else if (option === "tomorrow") {
+  if (option === "tomorrow") {
     d.setDate(d.getDate() + 1);
-    d.setHours(23, 59, 0, 0);
-  } else {
+  } else if (option === "week") {
     d.setDate(d.getDate() + (7 - d.getDay()));
-    d.setHours(23, 59, 0, 0);
   }
+  d.setHours(23, 59, 0, 0);
   return d.toISOString();
 }
 
@@ -64,27 +69,16 @@ export default function DeadlinePicker({
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="flex gap-2">
-        <button
-          className={quickPickClass}
-          disabled={isSaving}
-          onClick={() => saveDeadline(getQuickPickDate("today"))}
-        >
-          Today
-        </button>
-        <button
-          className={quickPickClass}
-          disabled={isSaving}
-          onClick={() => saveDeadline(getQuickPickDate("tomorrow"))}
-        >
-          Tomorrow
-        </button>
-        <button
-          className={quickPickClass}
-          disabled={isSaving}
-          onClick={() => saveDeadline(getQuickPickDate("week"))}
-        >
-          This week
-        </button>
+        {QUICK_PICKS.map(({ label, option }) => (
+          <button
+            key={option}
+            className={quickPickClass}
+            disabled={isSaving}
+            onClick={() => saveDeadline(getQuickPickDate(option))}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <div className="flex gap-2 items-center">
         <input

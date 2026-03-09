@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import LoadingDecompose from "./LoadingDecompose";
+import ErrorAlert from "@/components/ErrorAlert";
 
 export default function TaskInput() {
   const [input, setInput] = useState("");
@@ -76,11 +77,9 @@ export default function TaskInput() {
           autoFocus
         />
 
-        {error && (
-          <p id="task-error" role="alert" className="text-red-500 text-sm mt-2 text-center">
-            {error}
-          </p>
-        )}
+        {error ? (
+          <ErrorAlert id="task-error" message={error} className="mt-2 text-center" />
+        ) : null}
 
         <button
           type="submit"

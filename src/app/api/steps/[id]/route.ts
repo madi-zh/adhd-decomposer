@@ -1,6 +1,8 @@
 import { NextResponse, after } from "next/server";
+
+import { requireSession } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 import { calculateXp } from "@/lib/xp";
 
 function todayDateString(): string {
@@ -18,18 +20,15 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const [session, { id }] = await Promise.all([auth(), params]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const [auth, { id }] = await Promise.all([requireSession(), params]);
+    if (auth.error) return auth.error;
 
-    // Verify ownership through the parent task
     const step = await prisma.step.findUnique({
       where: { id },
       include: { task: { select: { userId: true } } },
     });
 
-    if (!step || step.task.userId !== session.user.id) {
+    if (!step || step.task.userId !== auth.userId) {
       return NextResponse.json({ error: "Step not found" }, { status: 404 });
     }
 
@@ -41,7 +40,6 @@ export async function PATCH(
       },
     });
 
-    // Run task completion check and streak/XP update after response is sent
     after(async () => {
       const remainingSteps = await prisma.step.count({
         where: {
@@ -50,83 +48,84 @@ export async function PATCH(
         },
       });
 
-      if (remainingSteps === 0) {
-        const [task, stepCount] = await Promise.all([
-          prisma.task.update({
-            where: { id: updatedStep.taskId },
-            data: {
-              status: "completed",
-              completedAt: new Date(),
-            },
-          }),
-          prisma.step.count({
-            where: { taskId: updatedStep.taskId },
-          }),
-        ]);
+      if (remainingSteps !== 0) return;
 
-        // Fetch or create UserStreak
-        const userId = session.user!.id!;
-        const streak = await prisma.userStreak.findUnique({
-          where: { userId },
-        });
-
-        const today = todayDateString();
-        const yesterday = yesterdayDateString();
-
-        let newCurrentStreak: number;
-        if (!streak) {
-          newCurrentStreak = 1;
-        } else if (streak.lastActiveDate === today) {
-          // Already counted today — no streak change
-          newCurrentStreak = streak.currentStreak;
-        } else if (streak.lastActiveDate === yesterday) {
-          newCurrentStreak = streak.currentStreak + 1;
-        } else {
-          // Gap or null — reset to 1
-          newCurrentStreak = 1;
-        }
-
-        const completedBeforeDeadline =
-          task.deadline !== null && new Date() <= task.deadline;
-
-        const xp = calculateXp(
-          stepCount,
-          newCurrentStreak,
-          completedBeforeDeadline
-        );
-
-        const newLongestStreak = Math.max(
-          newCurrentStreak,
-          streak?.longestStreak ?? 0
-        );
-        const newTotalXp = (streak?.totalXp ?? 0) + xp;
-
-        await prisma.userStreak.upsert({
-          where: { userId },
-          create: {
-            userId,
-            currentStreak: newCurrentStreak,
-            longestStreak: newLongestStreak,
-            lastActiveDate: today,
-            totalXp: newTotalXp,
-          },
-          update: {
-            currentStreak: newCurrentStreak,
-            longestStreak: newLongestStreak,
-            lastActiveDate: today,
-            totalXp: newTotalXp,
-          },
-        });
-
-        await prisma.task.update({
+      const now = new Date();
+      const userId = auth.userId;
+      const [task, estimate, stepCount, streak] = await Promise.all([
+        prisma.task.update({
           where: { id: updatedStep.taskId },
-          data: { xpAwarded: xp },
+          data: { status: "completed", completedAt: now },
+        }),
+        prisma.timeEstimate.findUnique({
+          where: { taskId: updatedStep.taskId },
+        }),
+        prisma.step.count({
+          where: { taskId: updatedStep.taskId },
+        }),
+        prisma.userStreak.findUnique({
+          where: { userId },
+        }),
+      ]);
+
+      if (estimate && !estimate.completedAt) {
+        const actual = Math.round(
+          (now.getTime() - estimate.startedAt.getTime()) / 60000
+        );
+        await prisma.timeEstimate.update({
+          where: { id: estimate.id },
+          data: { completedAt: now, actualMinutes: actual },
         });
       }
+
+      const today = todayDateString();
+      const yesterday = yesterdayDateString();
+
+      let newCurrentStreak: number;
+      if (!streak) {
+        newCurrentStreak = 1;
+      } else if (streak.lastActiveDate === today) {
+        newCurrentStreak = streak.currentStreak;
+      } else if (streak.lastActiveDate === yesterday) {
+        newCurrentStreak = streak.currentStreak + 1;
+      } else {
+        newCurrentStreak = 1;
+      }
+
+      const completedBeforeDeadline =
+        task.deadline !== null && now <= task.deadline;
+
+      const xp = calculateXp(stepCount, newCurrentStreak, completedBeforeDeadline);
+
+      const newLongestStreak = Math.max(
+        newCurrentStreak,
+        streak?.longestStreak ?? 0
+      );
+      const newTotalXp = (streak?.totalXp ?? 0) + xp;
+
+      const streakData = {
+        currentStreak: newCurrentStreak,
+        longestStreak: newLongestStreak,
+        lastActiveDate: today,
+        totalXp: newTotalXp,
+      };
+
+      await Promise.all([
+        prisma.userStreak.upsert({
+          where: { userId },
+          create: { userId, ...streakData },
+          update: streakData,
+        }),
+        prisma.task.update({
+          where: { id: updatedStep.taskId },
+          data: { xpAwarded: xp },
+        }),
+      ]);
     });
 
     return NextResponse.json({ step: updatedStep });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "PATCH /api/steps/[id]" }, "Failed to update step");
     return NextResponse.json(
       { error: "Failed to update step." },
       { status: 500 }

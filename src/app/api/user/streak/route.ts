@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
+
+import { requireSession } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { getUnlockedThemes } from "@/lib/xp";
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (auth.error) return auth.error;
 
     const streak = await prisma.userStreak.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: auth.userId },
+      select: {
+        currentStreak: true,
+        longestStreak: true,
+        totalXp: true,
+        lastActiveDate: true,
+      },
     });
 
     if (!streak) {
@@ -20,20 +25,12 @@ export async function GET() {
         longestStreak: 0,
         totalXp: 0,
         lastActiveDate: null,
-        unlockedThemes: ["default"],
-        currentLevel: 0,
       });
     }
 
-    return NextResponse.json({
-      currentStreak: streak.currentStreak,
-      longestStreak: streak.longestStreak,
-      totalXp: streak.totalXp,
-      lastActiveDate: streak.lastActiveDate,
-      unlockedThemes: getUnlockedThemes(streak.totalXp),
-      currentLevel: Math.floor(streak.totalXp / 100),
-    });
-  } catch {
+    return NextResponse.json(streak);
+  } catch (err) {
+    logger.error({ err, route: "GET /api/user/streak" }, "Failed to fetch streak");
     return NextResponse.json(
       { error: "Failed to fetch streak." },
       { status: 500 }

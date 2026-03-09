@@ -1,10 +1,13 @@
-export default function ErrorAlert({ message }: { message: string }) {
+interface ErrorAlertProps {
+  message: string;
+  className?: string;
+  id?: string;
+}
+
+export default function ErrorAlert({ message, className = "", id }: ErrorAlertProps) {
   return (
-    <div
-      role="alert"
-      className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3"
-    >
+    <p id={id} role="alert" className={`text-red-500 text-sm ${className}`}>
       {message}
-    </div>
+    </p>
   );
 }

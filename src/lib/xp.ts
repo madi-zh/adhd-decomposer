@@ -1,7 +1,11 @@
-export const CELEBRATION_THEMES: Record<
-  string,
-  { minXp: number; colors: string[] }
-> = {
+export interface CelebrationTheme {
+  minXp: number;
+  colors: string[];
+}
+
+export type ThemeName = "default" | "ocean" | "sunset" | "forest" | "galaxy" | "rainbow";
+
+export const CELEBRATION_THEMES: Record<ThemeName, CelebrationTheme> = {
   default: { minXp: 0, colors: ["#f59e0b", "#10b981", "#6366f1"] },
   ocean: { minXp: 50, colors: ["#3b82f6", "#06b6d4", "#14b8a6"] },
   sunset: { minXp: 150, colors: ["#f97316", "#ec4899", "#a855f7"] },
@@ -16,6 +20,10 @@ export const CELEBRATION_THEMES: Record<
   },
 };
 
+const SORTED_THEMES = (Object.entries(CELEBRATION_THEMES) as [ThemeName, CelebrationTheme][]).sort(
+  ([, a], [, b]) => a.minXp - b.minXp
+);
+
 export function calculateXp(
   stepCount: number,
   currentStreak: number,
@@ -28,21 +36,20 @@ export function calculateXp(
   return base + stepBonus + streakBonus + deadlineBonus;
 }
 
-export function getUnlockedThemes(totalXp: number): string[] {
-  return Object.entries(CELEBRATION_THEMES)
+export function getUnlockedThemes(totalXp: number): ThemeName[] {
+  return SORTED_THEMES
     .filter(([, theme]) => totalXp >= theme.minXp)
-    .map(([name]) => name);
+    .map(([name]) => name as ThemeName);
 }
 
 export function getActiveTheme(totalXp: number): {
-  name: string;
+  name: ThemeName;
   colors: string[];
 } {
-  let active = { name: "default", colors: CELEBRATION_THEMES.default.colors };
-  for (const [name, theme] of Object.entries(CELEBRATION_THEMES)) {
-    if (totalXp >= theme.minXp) {
-      active = { name, colors: theme.colors };
-    }
+  let active: { name: ThemeName; colors: string[] } = { name: "default", colors: CELEBRATION_THEMES.default.colors };
+  for (const [name, theme] of SORTED_THEMES) {
+    if (totalXp < theme.minXp) break;
+    active = { name, colors: theme.colors };
   }
   return active;
 }

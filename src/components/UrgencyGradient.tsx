@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 
 interface UrgencyGradientProps {
   deadline: string;
@@ -12,32 +12,20 @@ function computeUrgency(deadline: string, createdAt: string) {
   const now = Date.now();
   const start = new Date(createdAt).getTime();
   const end = new Date(deadline).getTime();
-  const totalDuration = end - start;
   const remaining = end - now;
 
-  let borderClass: string;
-  let urgencyText: string;
-  let bgClass = "";
-
   if (remaining <= 0) {
-    borderClass = "border-red-500";
-    bgClass = "bg-red-50";
-    urgencyText = "Overdue";
-  } else {
-    const pctRemaining = remaining / totalDuration;
-    if (pctRemaining > 0.5) {
-      borderClass = "border-blue-300";
-      urgencyText = "Plenty of time remaining";
-    } else if (pctRemaining > 0.25) {
-      borderClass = "border-amber-400";
-      urgencyText = "Time is running low";
-    } else {
-      borderClass = "border-red-400";
-      urgencyText = "Urgent — deadline approaching";
-    }
+    return { borderClass: "border-red-500", bgClass: "bg-red-50", urgencyText: "Overdue", isOverdue: true };
   }
 
-  return { borderClass, bgClass, urgencyText, isOverdue: remaining <= 0 };
+  const pctRemaining = remaining / (end - start);
+  if (pctRemaining > 0.5) {
+    return { borderClass: "border-blue-300", bgClass: "", urgencyText: "Plenty of time remaining", isOverdue: false };
+  }
+  if (pctRemaining > 0.25) {
+    return { borderClass: "border-amber-400", bgClass: "", urgencyText: "Time is running low", isOverdue: false };
+  }
+  return { borderClass: "border-red-400", bgClass: "", urgencyText: "Urgent — deadline approaching", isOverdue: false };
 }
 
 export default function UrgencyGradient({
@@ -45,21 +33,25 @@ export default function UrgencyGradient({
   createdAt,
   children,
 }: UrgencyGradientProps) {
-  const { borderClass, bgClass, urgencyText, isOverdue } = useMemo(
-    () => computeUrgency(deadline, createdAt),
-    [deadline, createdAt]
-  );
+  const [urgency, setUrgency] = useState(() => computeUrgency(deadline, createdAt));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setUrgency(computeUrgency(deadline, createdAt));
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [deadline, createdAt]);
 
   return (
     <div
-      className={`rounded-3xl p-0.5 border-2 transition-colors duration-1000 ${borderClass} ${bgClass}`}
+      className={`rounded-3xl p-0.5 border-2 transition-colors duration-1000 ${urgency.borderClass} ${urgency.bgClass}`}
     >
-      <span className="sr-only">{urgencyText}</span>
-      {isOverdue && (
+      <span className="sr-only">{urgency.urgencyText}</span>
+      {urgency.isOverdue ? (
         <p className="text-red-600 text-xs font-medium text-center pt-2">
           Overdue
         </p>
-      )}
+      ) : null}
       {children}
     </div>
   );

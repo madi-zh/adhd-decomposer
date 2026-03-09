@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { logger } from "@/lib/logger";
 
 const anthropic = new Anthropic();
 
@@ -22,6 +23,7 @@ No markdown, no explanation, no extra text. Just the JSON object.`;
 export async function decomposeTask(
   userInput: string
 ): Promise<{ title: string; steps: string[] }> {
+  const start = performance.now();
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 1024,
@@ -33,8 +35,28 @@ export async function decomposeTask(
       },
     ],
   });
+  const durationMs = Math.round(performance.now() - start);
 
-  const text =
-    message.content[0].type === "text" ? message.content[0].text : "";
-  return JSON.parse(text);
+  const firstBlock = message.content[0];
+  const raw = firstBlock?.type === "text" ? firstBlock.text : "";
+  const text = raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
+
+  logger.info(
+    { durationMs, model: message.model, usage: message.usage },
+    "Claude API call completed"
+  );
+
+  const parsed: unknown = JSON.parse(text);
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !("title" in parsed) ||
+    !("steps" in parsed) ||
+    typeof (parsed as { title: unknown }).title !== "string" ||
+    !Array.isArray((parsed as { steps: unknown }).steps)
+  ) {
+    throw new Error("Claude returned an unexpected response format");
+  }
+
+  return parsed as { title: string; steps: string[] };
 }

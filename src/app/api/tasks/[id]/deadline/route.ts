@@ -1,26 +1,26 @@
 import { NextResponse } from "next/server";
+
+import { findOwnedTask, requireSession } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const [session, { id }] = await Promise.all([auth(), params]);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const [auth, { id }, body] = await Promise.all([
+      requireSession(),
+      params,
+      request.json(),
+    ]);
+    if (auth.error) return auth.error;
 
-    const task = await prisma.task.findUnique({
-      where: { id, userId: session.user.id },
-    });
-
+    const task = await findOwnedTask(id, auth.userId);
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const body = await request.json();
     const deadline = new Date(body.deadline);
 
     if (isNaN(deadline.getTime()) || deadline <= new Date()) {
@@ -36,7 +36,8 @@ export async function PATCH(
     });
 
     return NextResponse.json({ id: updated.id, deadline: updated.deadline });
-  } catch {
+  } catch (err) {
+    logger.error({ err, route: "PATCH /api/tasks/[id]/deadline" }, "Failed to set deadline");
     return NextResponse.json(
       { error: "Failed to set deadline." },
       { status: 500 }
