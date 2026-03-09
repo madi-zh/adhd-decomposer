@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
@@ -41,6 +41,21 @@ const FocusRoomInvite = dynamic(
   { ssr: false }
 );
 
+const FocusContract = dynamic(
+  () => import("@/components/FocusContract"),
+  { ssr: false }
+);
+
+const FocusTimer = dynamic(
+  () => import("@/components/FocusTimer"),
+  { ssr: false }
+);
+
+const EveningModeOverlay = dynamic(
+  () => import("@/components/EveningModeOverlay"),
+  { ssr: false }
+);
+
 interface Step {
   id: string;
   content: string;
@@ -66,12 +81,35 @@ interface TimeEstimateData {
   actualMinutes: number | null;
 }
 
-type Phase = "focus-room-invite" | "mood-before" | "regulation" | "time-estimate" | "steps" | "mood-after" | "celebration";
+interface FocusSessionData {
+  id: string;
+  timeLimitMin: number;
+  startedAt: string;
+}
+
+interface UserSettingsData {
+  eveningCutoffHour: number;
+  eveningCutoffMin: number;
+  enableEveningMode: boolean;
+  enableFocusTimer: boolean;
+}
+
+type Phase =
+  | "focus-room-invite"
+  | "mood-before"
+  | "regulation"
+  | "focus-contract"
+  | "time-estimate"
+  | "steps"
+  | "mood-after"
+  | "celebration";
 
 function getInitialPhase(
   moodCheckIns?: ExistingMoodCheckIn[],
   allStepsComplete?: boolean,
-  hasTimeEstimate?: boolean
+  hasTimeEstimate?: boolean,
+  hasFocusSession?: boolean,
+  enableFocusTimer?: boolean
 ): Phase {
   const hasBefore = moodCheckIns?.some((m) => m.timing === "before");
   const hasAfter = moodCheckIns?.some((m) => m.timing === "after");
@@ -79,9 +117,11 @@ function getInitialPhase(
   if (allStepsComplete) {
     return hasAfter ? "celebration" : "mood-after";
   }
-  // If they already did a before check-in, check if they need time estimate
   if (hasBefore) {
-    return hasTimeEstimate ? "steps" : "time-estimate";
+    if (hasFocusSession || !enableFocusTimer) {
+      return hasTimeEstimate ? "steps" : "time-estimate";
+    }
+    return "focus-contract";
   }
   return "focus-room-invite";
 }
@@ -90,10 +130,14 @@ export default function TaskStepController({
   task: initialTask,
   timeEstimate: initialEstimate,
   initialFocusCount = 0,
+  userSettings,
+  focusSession: initialFocusSession,
 }: {
   task: Task;
   timeEstimate: TimeEstimateData | null;
   initialFocusCount?: number;
+  userSettings?: UserSettingsData;
+  focusSession?: FocusSessionData | null;
 }) {
   const [steps, setSteps] = useState(initialTask.steps);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -113,12 +157,43 @@ export default function TaskStepController({
       : null
   );
   const [skippedEstimate, setSkippedEstimate] = useState(false);
+  const [focusSession, setFocusSession] = useState<FocusSessionData | null>(
+    initialFocusSession ?? null
+  );
+  const [eveningDismissed, setEveningDismissed] = useState(false);
+  const sessionIdRef = useRef(focusSession?.id ?? null);
 
-  const existingBeforeMood = initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null;
+  // Keep ref in sync for sendBeacon cleanup
+  useEffect(() => {
+    sessionIdRef.current = focusSession?.id ?? null;
+  }, [focusSession]);
+
+  // End focus session on unmount via sendBeacon
+  useEffect(() => {
+    return () => {
+      const sid = sessionIdRef.current;
+      if (sid) {
+        const body = JSON.stringify({ action: "end" });
+        navigator.sendBeacon(
+          `/api/focus-session/${sid}`,
+          new Blob([body], { type: "application/json" })
+        );
+      }
+    };
+  }, []);
+
+  const existingBeforeMood =
+    initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null;
 
   const [phase, setPhase] = useState<Phase>(() => {
     const allComplete = initialTask.steps.every((s) => s.isCompleted);
-    return getInitialPhase(initialTask.moodCheckIns, allComplete, !!initialEstimate);
+    return getInitialPhase(
+      initialTask.moodCheckIns,
+      allComplete,
+      !!initialEstimate,
+      !!initialFocusSession,
+      userSettings?.enableFocusTimer
+    );
   });
   const [moodBefore, setMoodBefore] = useState<string | null>(existingBeforeMood);
   const [moodAfter, setMoodAfter] = useState<string | null>(
@@ -165,16 +240,41 @@ export default function TaskStepController({
     if ((DISTRESSED_MOODS as readonly string[]).includes(mood)) {
       setPhase("regulation");
     } else {
-      setPhase("time-estimate");
+      setPhase("focus-contract");
     }
   }, []);
 
   const handleMoodBeforeSkip = useCallback(() => {
-    setPhase("time-estimate");
+    setPhase("focus-contract");
   }, []);
 
   const handleRegulationDone = useCallback(() => {
+    setPhase("focus-contract");
+  }, []);
+
+  const handleSessionStart = useCallback(
+    (session: FocusSessionData) => {
+      setFocusSession(session);
+      setPhase("time-estimate");
+    },
+    []
+  );
+
+  const handleSkipContract = useCallback(() => {
     setPhase("time-estimate");
+  }, []);
+
+  const handleEstimateSet = useCallback(
+    (estimateMinutes: number, startedAt: string) => {
+      setEstimate({ estimateMinutes, startedAt });
+      setPhase("steps");
+    },
+    []
+  );
+
+  const handleEstimateSkip = useCallback(() => {
+    setSkippedEstimate(true);
+    setPhase("steps");
   }, []);
 
   const handleMoodAfterComplete = useCallback((mood: string) => {
@@ -186,20 +286,14 @@ export default function TaskStepController({
     setPhase("celebration");
   }, []);
 
-  const handleEstimateSet = useCallback((estimateMinutes: number, startedAt: string) => {
-    setEstimate({ estimateMinutes, startedAt });
-    setPhase("steps");
-  }, []);
-
-  const handleEstimateSkip = useCallback(() => {
-    setSkippedEstimate(true);
-    setPhase("steps");
+  const handleEveningDismiss = useCallback(() => {
+    setEveningDismissed(true);
   }, []);
 
   async function handleStepComplete() {
     if (isCompleting || !currentStep) return;
     const activeStep = currentStep;
-    const isLastStep = steps.filter((s) => !s.isCompleted).length === 1;
+    const isLastStep = steps.length - completedCount === 1;
 
     setIsCompleting(true);
     setError("");
@@ -257,12 +351,27 @@ export default function TaskStepController({
     );
   }
 
-  if (phase === "regulation" && moodBefore && (DISTRESSED_MOODS as readonly string[]).includes(moodBefore)) {
+  if (
+    phase === "regulation" &&
+    moodBefore &&
+    (DISTRESSED_MOODS as readonly string[]).includes(moodBefore)
+  ) {
     return (
       <MicroRegulation
         mood={moodBefore as DistressedMood}
         onComplete={handleRegulationDone}
         onSkip={handleRegulationDone}
+      />
+    );
+  }
+
+  if (phase === "focus-contract" && userSettings?.enableFocusTimer && !focusSession) {
+    return (
+      <FocusContract
+        taskId={initialTask.id}
+        taskTitle={initialTask.title}
+        onSessionStart={handleSessionStart}
+        onSkip={handleSkipContract}
       />
     );
   }
@@ -308,11 +417,20 @@ export default function TaskStepController({
     );
   }
 
+  // Steps phase
   return (
     <div className="pt-8">
       <h2 className="text-lg font-medium text-stone-600 text-center mb-8">
         {initialTask.title}
       </h2>
+
+      {focusSession && (
+        <FocusTimer
+          sessionId={focusSession.id}
+          timeLimitMin={focusSession.timeLimitMin}
+          startedAt={focusSession.startedAt}
+        />
+      )}
 
       {estimate ? (
         <AmbientTimer
@@ -343,6 +461,14 @@ export default function TaskStepController({
         onComplete={handleStepComplete}
         isCompleting={isCompleting}
       />
+
+      {userSettings?.enableEveningMode && !eveningDismissed && (
+        <EveningModeOverlay
+          cutoffHour={userSettings.eveningCutoffHour}
+          cutoffMin={userSettings.eveningCutoffMin}
+          onDismiss={handleEveningDismiss}
+        />
+      )}
     </div>
   );
 }

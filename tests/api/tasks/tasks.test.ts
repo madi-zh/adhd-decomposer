@@ -166,7 +166,6 @@ describe("GET /api/tasks", () => {
     ];
     mockTaskFindMany.mockResolvedValue(taskList as never);
 
-    const request = mockRequest("GET");
     const response = await GET();
     const body = await response.json();
 

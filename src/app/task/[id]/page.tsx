@@ -20,7 +20,7 @@ export default async function TaskPage({
     redirect("/login");
   }
 
-  const [task, focusCount] = await Promise.all([
+  const [task, userSettings, activeFocusSession, focusCount] = await Promise.all([
     prisma.task.findUnique({
       where: { id, userId: session.user.id },
       include: {
@@ -31,6 +31,20 @@ export default async function TaskPage({
           orderBy: { createdAt: "asc" },
         },
       },
+    }),
+    prisma.userSettings.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        eveningCutoffHour: true,
+        eveningCutoffMin: true,
+        enableEveningMode: true,
+        enableFocusTimer: true,
+      },
+    }),
+    prisma.focusSession.findFirst({
+      where: { taskId: id, userId: session.user.id, endedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, timeLimitMin: true, startedAt: true },
     }),
     getActiveFocusCount(),
   ]);
@@ -65,6 +79,16 @@ export default async function TaskPage({
       }}
       timeEstimate={timeEstimate}
       initialFocusCount={focusCount}
+      userSettings={userSettings ?? undefined}
+      focusSession={
+        activeFocusSession
+          ? {
+              id: activeFocusSession.id,
+              timeLimitMin: activeFocusSession.timeLimitMin,
+              startedAt: activeFocusSession.startedAt.toISOString(),
+            }
+          : null
+      }
     />
   );
 }

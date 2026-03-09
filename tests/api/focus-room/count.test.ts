@@ -22,7 +22,7 @@ describe("GET /api/focus-room/count", () => {
 
   describe("returns active focus count", () => {
     it("returns activeCount with the number of active presences", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockCount.mockResolvedValue(7);
 
       const res = await GET();
@@ -33,7 +33,7 @@ describe("GET /api/focus-room/count", () => {
     });
 
     it("returns activeCount of 0 when no users are active", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockCount.mockResolvedValue(0);
 
       const res = await GET();
@@ -44,7 +44,7 @@ describe("GET /api/focus-room/count", () => {
     });
 
     it("queries count using a 2-minute activity window", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockCount.mockResolvedValue(4);
 
       await GET();
@@ -59,7 +59,7 @@ describe("GET /api/focus-room/count", () => {
     });
 
     it("calls prisma.focusRoomPresence.count exactly once", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockCount.mockResolvedValue(2);
 
       await GET();

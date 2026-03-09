@@ -4,7 +4,6 @@ import {
   MOOD_MAP,
   VALID_MOOD_KEYS,
   DISTRESSED_MOODS,
-  type Mood,
   type DistressedMood,
 } from "@/lib/moods";
 

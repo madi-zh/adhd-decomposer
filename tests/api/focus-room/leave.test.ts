@@ -31,7 +31,7 @@ describe("POST /api/focus-room/leave", () => {
 
   describe("leaves focus room successfully", () => {
     it("returns success:true when presenceId is provided", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 1 });
 
       const res = await POST(makeRequest({ presenceId: PRESENCE_ID }));
@@ -42,7 +42,7 @@ describe("POST /api/focus-room/leave", () => {
     });
 
     it("deletes the presence record scoped to userId and presenceId", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 1 });
 
       await POST(makeRequest({ presenceId: PRESENCE_ID }));
@@ -53,7 +53,7 @@ describe("POST /api/focus-room/leave", () => {
     });
 
     it("returns success:true even when presenceId is omitted", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
 
       const res = await POST(makeRequest({}));
       const json = await res.json();
@@ -63,7 +63,7 @@ describe("POST /api/focus-room/leave", () => {
     });
 
     it("does not call deleteMany when presenceId is omitted", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
 
       await POST(makeRequest({}));
 
@@ -99,7 +99,7 @@ describe("DELETE /api/focus-room/leave", () => {
 
   describe("leaves focus room successfully", () => {
     it("returns success:true when presenceId is provided via DELETE", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 1 });
 
       const res = await DELETE(makeRequest({ presenceId: PRESENCE_ID }));
@@ -110,7 +110,7 @@ describe("DELETE /api/focus-room/leave", () => {
     });
 
     it("delegates to same handler as POST and calls deleteMany with correct args", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 1 });
 
       await DELETE(makeRequest({ presenceId: PRESENCE_ID }));

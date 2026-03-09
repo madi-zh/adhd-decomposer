@@ -52,7 +52,7 @@ describe("POST /api/focus-room/ping", () => {
 
   describe("updates ping timestamp and cleans stale presences", () => {
     it("returns activeUsers list and totalActive count on success", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([mockActiveUser] as never);
 
@@ -65,7 +65,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("updates lastPingAt and stepContent for caller's presence", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([] as never);
 
@@ -81,7 +81,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("truncates stepContent to 50 characters", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([] as never);
 
@@ -98,7 +98,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("sets stepContent to null when stepContent is omitted", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([] as never);
 
@@ -112,7 +112,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("queries active users excluding the caller by userId", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([mockActiveUser] as never);
 
@@ -129,7 +129,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("maps active users to avatarSeed, stepContent, and minutesFocusing", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([mockActiveUser] as never);
 
@@ -144,7 +144,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("deletes stale presences older than 5 minutes via after()", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([] as never);
       mockDeleteMany.mockResolvedValue({ count: 2 });
@@ -161,7 +161,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("returns totalActive of 1 when no other users are active", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockUpdateMany.mockResolvedValue({ count: 1 });
       mockFindMany.mockResolvedValue([] as never);
 
@@ -196,7 +196,7 @@ describe("POST /api/focus-room/ping", () => {
 
   describe("returns 400 when presenceId is missing", () => {
     it("returns 400 with error message when presenceId is not provided", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
 
       const res = await POST(makeRequest({}));
       const json = await res.json();
@@ -206,7 +206,7 @@ describe("POST /api/focus-room/ping", () => {
     });
 
     it("does not call updateMany when presenceId is missing", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
 
       await POST(makeRequest({}));
 

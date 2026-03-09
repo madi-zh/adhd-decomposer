@@ -48,7 +48,7 @@ describe("POST /api/focus-room/join", () => {
 
   describe("joins focus room successfully", () => {
     it("returns presenceId, avatarSeed and activeCount on success", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 0 });
       mockCreate.mockResolvedValue(mockPresence as never);
       mockCount.mockResolvedValue(3);
@@ -65,7 +65,7 @@ describe("POST /api/focus-room/join", () => {
     });
 
     it("deletes stale presence for the user before creating a new one", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 1 });
       mockCreate.mockResolvedValue(mockPresence as never);
       mockCount.mockResolvedValue(1);
@@ -78,7 +78,7 @@ describe("POST /api/focus-room/join", () => {
     });
 
     it("creates presence with taskId when taskId is provided in body", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 0 });
       mockCreate.mockResolvedValue({ ...mockPresence, taskId: "task-abc" } as never);
       mockCount.mockResolvedValue(2);
@@ -93,7 +93,7 @@ describe("POST /api/focus-room/join", () => {
     });
 
     it("creates presence with null taskId when taskId is omitted", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 0 });
       mockCreate.mockResolvedValue(mockPresence as never);
       mockCount.mockResolvedValue(1);
@@ -108,7 +108,7 @@ describe("POST /api/focus-room/join", () => {
     });
 
     it("queries active count using a 2-minute window", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as any);
+      vi.mocked(auth).mockResolvedValueOnce({ user: { id: USER_ID } } as Awaited<ReturnType<typeof auth>>);
       mockDeleteMany.mockResolvedValue({ count: 0 });
       mockCreate.mockResolvedValue(mockPresence as never);
       mockCount.mockResolvedValue(5);
