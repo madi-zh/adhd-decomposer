@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface AmbientTimerProps {
   startedAt: string;
@@ -13,15 +13,19 @@ function formatElapsed(totalSeconds: number): string {
   return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
+function getTimerColor(ratio: number): string {
+  if (ratio > 1) return "text-amber-600";
+  if (ratio > 0.8) return "text-amber-500";
+  return "text-stone-400";
+}
+
 export default function AmbientTimer({
   startedAt,
   estimateMinutes,
 }: AmbientTimerProps) {
-  const startTime = useMemo(() => new Date(startedAt).getTime(), [startedAt]);
-
-  const [elapsedSeconds, setElapsedSeconds] = useState(() => {
-    return Math.floor((Date.now() - startTime) / 1000);
-  });
+  const [elapsedSeconds, setElapsedSeconds] = useState(() =>
+    Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)
+  );
 
   const lastAnnouncedRef = useRef(0);
   const announcementRef = useRef<HTMLSpanElement>(null);
@@ -33,12 +37,11 @@ export default function AmbientTimer({
   }, []);
 
   useEffect(() => {
+    const start = new Date(startedAt).getTime();
     const interval = setInterval(() => {
-      const now = Date.now();
-      const elapsed = Math.floor((now - startTime) / 1000);
+      const elapsed = Math.floor((Date.now() - start) / 1000);
       setElapsedSeconds(elapsed);
 
-      // Announce every 5 minutes for screen readers
       const elapsedMinutes = Math.floor(elapsed / 60);
       const fiveMinBlock = Math.floor(elapsedMinutes / 5);
       if (fiveMinBlock > lastAnnouncedRef.current && fiveMinBlock > 0) {
@@ -48,16 +51,9 @@ export default function AmbientTimer({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime, announce]);
+  }, [startedAt, announce]);
 
-  const ratio = elapsedSeconds / (estimateMinutes * 60);
-
-  let colorClass = "text-stone-400";
-  if (ratio > 1) {
-    colorClass = "text-amber-600";
-  } else if (ratio > 0.8) {
-    colorClass = "text-amber-500";
-  }
+  const colorClass = getTimerColor(elapsedSeconds / (estimateMinutes * 60));
 
   return (
     <div role="timer" className={`text-center text-sm mb-2 ${colorClass}`}>

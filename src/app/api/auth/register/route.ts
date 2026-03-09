@@ -1,7 +1,9 @@
-import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { NextResponse } from "next/server";
+
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
+import { BCRYPT_SALT_ROUNDS, MIN_PASSWORD_LENGTH, normalizeEmail } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
@@ -22,18 +24,18 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!password || typeof password !== "string" || password.length < 8) {
+    if (!password || typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json(
-        { error: "Password must be at least 8 characters." },
+        { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
         { status: 400 }
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = normalizeEmail(email);
 
     const [existingUser, hashedPassword] = await Promise.all([
       prisma.user.findUnique({ where: { email: normalizedEmail } }),
-      bcrypt.hash(password, 12),
+      bcrypt.hash(password, BCRYPT_SALT_ROUNDS),
     ]);
 
     if (existingUser) {

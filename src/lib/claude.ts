@@ -37,8 +37,8 @@ export async function decomposeTask(
   });
   const durationMs = Math.round(performance.now() - start);
 
-  const raw =
-    message.content[0].type === "text" ? message.content[0].text : "";
+  const firstBlock = message.content[0];
+  const raw = firstBlock?.type === "text" ? firstBlock.text : "";
   const text = raw.replace(/^```(?:json)?\s*|\s*```$/g, "").trim();
 
   logger.info(
@@ -46,5 +46,17 @@ export async function decomposeTask(
     "Claude API call completed"
   );
 
-  return JSON.parse(text);
+  const parsed: unknown = JSON.parse(text);
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !("title" in parsed) ||
+    !("steps" in parsed) ||
+    typeof (parsed as { title: unknown }).title !== "string" ||
+    !Array.isArray((parsed as { steps: unknown }).steps)
+  ) {
+    throw new Error("Claude returned an unexpected response format");
+  }
+
+  return parsed as { title: string; steps: string[] };
 }

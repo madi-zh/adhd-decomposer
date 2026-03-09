@@ -1,28 +1,32 @@
-export function seedToColor(seed: string): string {
+export const PRESENCE_TIMEOUT_MS = 2 * 60 * 1000;
+
+function djb2Hash(input: string): number {
   let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < input.length; i++) {
+    hash = input.charCodeAt(i) + ((hash << 5) - hash);
   }
-  const hue = Math.abs(hash) % 360;
-  // Convert HSL(hue, 60%, 60%) to hex
-  const h = hue;
+  return Math.abs(hash);
+}
+
+export function seedToColor(seed: string): string {
+  const hue = djb2Hash(seed) % 360;
   const s = 0.6;
   const l = 0.6;
   const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
   const m = l - c / 2;
   let r = 0,
     g = 0,
     b = 0;
-  if (h < 60) {
+  if (hue < 60) {
     r = c; g = x; b = 0;
-  } else if (h < 120) {
+  } else if (hue < 120) {
     r = x; g = c; b = 0;
-  } else if (h < 180) {
+  } else if (hue < 180) {
     r = 0; g = c; b = x;
-  } else if (h < 240) {
+  } else if (hue < 240) {
     r = 0; g = x; b = c;
-  } else if (h < 300) {
+  } else if (hue < 300) {
     r = x; g = 0; b = c;
   } else {
     r = c; g = 0; b = x;
@@ -36,14 +40,9 @@ export function seedToColor(seed: string): string {
 
 export function generateAvatarSeed(userId: string): string {
   const date = new Date().toISOString().slice(0, 10);
-  const str = userId + date;
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return Math.abs(hash).toString(36);
+  return djb2Hash(userId + date).toString(36);
 }
 
 export function isPresenceActive(lastPingAt: Date): boolean {
-  return lastPingAt.getTime() > Date.now() - 2 * 60 * 1000;
+  return lastPingAt.getTime() > Date.now() - PRESENCE_TIMEOUT_MS;
 }

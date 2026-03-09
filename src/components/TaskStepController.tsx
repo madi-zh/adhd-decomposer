@@ -4,6 +4,8 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import StepCard from "@/components/StepCard";
 import ProgressBar from "@/components/ProgressBar";
+import DeadlinePicker from "@/components/DeadlinePicker";
+import UrgencyGradient from "@/components/UrgencyGradient";
 import ErrorAlert from "@/components/ErrorAlert";
 import { DISTRESSED_MOODS, type DistressedMood } from "@/lib/moods";
 
@@ -71,6 +73,10 @@ interface Task {
   id: string;
   title: string;
   steps: Step[];
+  createdAt: string;
+  deadline?: string | null;
+  confettiColors?: string[];
+  xpAwarded?: number;
   moodCheckIns?: ExistingMoodCheckIn[];
 }
 
@@ -104,6 +110,10 @@ type Phase =
   | "mood-after"
   | "celebration";
 
+function isDistressedMood(mood: string): mood is DistressedMood {
+  return (DISTRESSED_MOODS as readonly string[]).includes(mood);
+}
+
 function getInitialPhase(
   moodCheckIns?: ExistingMoodCheckIn[],
   allStepsComplete?: boolean,
@@ -126,29 +136,34 @@ function getInitialPhase(
   return "focus-room-invite";
 }
 
+interface TaskStepControllerProps {
+  task: Task;
+  timeEstimate: TimeEstimateData | null;
+  initialFocusCount?: number;
+  userSettings?: UserSettingsData;
+  focusSession?: FocusSessionData | null;
+}
+
 export default function TaskStepController({
   task: initialTask,
   timeEstimate: initialEstimate,
   initialFocusCount = 0,
   userSettings,
   focusSession: initialFocusSession,
-}: {
-  task: Task;
-  timeEstimate: TimeEstimateData | null;
-  initialFocusCount?: number;
-  userSettings?: UserSettingsData;
-  focusSession?: FocusSessionData | null;
-}) {
+}: TaskStepControllerProps) {
   const [steps, setSteps] = useState(initialTask.steps);
   const [isCompleting, setIsCompleting] = useState(false);
   const [error, setError] = useState("");
+  const [deadline, setDeadline] = useState<string | null>(
+    initialTask.deadline ?? null
+  );
   const [focusRoom, setFocusRoom] = useState<{ presenceId: string } | null>(
     null
   );
   const [estimate, setEstimate] = useState<{
     estimateMinutes: number;
     startedAt: string;
-  } | null>(
+  } | null>(() =>
     initialEstimate
       ? {
           estimateMinutes: initialEstimate.estimateMinutes,
@@ -172,18 +187,14 @@ export default function TaskStepController({
   useEffect(() => {
     return () => {
       const sid = sessionIdRef.current;
-      if (sid) {
-        const body = JSON.stringify({ action: "end" });
-        navigator.sendBeacon(
-          `/api/focus-session/${sid}`,
-          new Blob([body], { type: "application/json" })
-        );
-      }
+      if (!sid) return;
+      const body = JSON.stringify({ action: "end" });
+      navigator.sendBeacon(
+        `/api/focus-session/${sid}`,
+        new Blob([body], { type: "application/json" })
+      );
     };
   }, []);
-
-  const existingBeforeMood =
-    initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null;
 
   const [phase, setPhase] = useState<Phase>(() => {
     const allComplete = initialTask.steps.every((s) => s.isCompleted);
@@ -195,9 +206,11 @@ export default function TaskStepController({
       userSettings?.enableFocusTimer
     );
   });
-  const [moodBefore, setMoodBefore] = useState<string | null>(existingBeforeMood);
+  const [moodBefore, setMoodBefore] = useState<string | null>(
+    () => initialTask.moodCheckIns?.find((m) => m.timing === "before")?.mood ?? null
+  );
   const [moodAfter, setMoodAfter] = useState<string | null>(
-    initialTask.moodCheckIns?.find((m) => m.timing === "after")?.mood ?? null
+    () => initialTask.moodCheckIns?.find((m) => m.timing === "after")?.mood ?? null
   );
 
   const { completedCount, currentStep } = useMemo(() => {
@@ -237,11 +250,7 @@ export default function TaskStepController({
 
   const handleMoodBeforeComplete = useCallback((mood: string) => {
     setMoodBefore(mood);
-    if ((DISTRESSED_MOODS as readonly string[]).includes(mood)) {
-      setPhase("regulation");
-    } else {
-      setPhase("focus-contract");
-    }
+    setPhase(isDistressedMood(mood) ? "regulation" : "focus-contract");
   }, []);
 
   const handleMoodBeforeSkip = useCallback(() => {
@@ -351,14 +360,10 @@ export default function TaskStepController({
     );
   }
 
-  if (
-    phase === "regulation" &&
-    moodBefore &&
-    (DISTRESSED_MOODS as readonly string[]).includes(moodBefore)
-  ) {
+  if (phase === "regulation" && moodBefore && isDistressedMood(moodBefore)) {
     return (
       <MicroRegulation
-        mood={moodBefore as DistressedMood}
+        mood={moodBefore}
         onComplete={handleRegulationDone}
         onSkip={handleRegulationDone}
       />
@@ -410,6 +415,8 @@ export default function TaskStepController({
     return (
       <Celebration
         taskTitle={initialTask.title}
+        confettiColors={initialTask.confettiColors}
+        xpAwarded={initialTask.xpAwarded}
         timeEstimate={timeData}
         moodBefore={moodBefore}
         moodAfter={moodAfter}
@@ -418,19 +425,29 @@ export default function TaskStepController({
   }
 
   // Steps phase
+  const stepCard = (
+    <StepCard
+      content={currentStep!.content}
+      stepNumber={completedCount + 1}
+      total={steps.length}
+      onComplete={handleStepComplete}
+      isCompleting={isCompleting}
+    />
+  );
+
   return (
     <div className="pt-8">
-      <h2 className="text-lg font-medium text-stone-600 text-center mb-8">
+      <h2 className="text-lg font-medium text-stone-600 text-center mb-4">
         {initialTask.title}
       </h2>
 
-      {focusSession && (
+      {focusSession ? (
         <FocusTimer
           sessionId={focusSession.id}
           timeLimitMin={focusSession.timeLimitMin}
           startedAt={focusSession.startedAt}
         />
-      )}
+      ) : null}
 
       {estimate ? (
         <AmbientTimer
@@ -439,36 +456,45 @@ export default function TaskStepController({
         />
       ) : null}
 
-      {focusRoom && (
+      {focusRoom ? (
         <FocusRoomPresenceBar
           presenceId={focusRoom.presenceId}
           currentStepContent={currentStep!.content.slice(0, 50)}
         />
+      ) : null}
+
+      {deadline ? null : (
+        <div className="text-center mb-4">
+          <DeadlinePicker
+            taskId={initialTask.id}
+            onDeadlineSet={setDeadline}
+          />
+        </div>
       )}
 
       <div className="mb-10">
         <ProgressBar completed={completedCount} total={steps.length} />
       </div>
 
-      {error && (
+      {error ? (
         <ErrorAlert message={error} className="text-center mb-4" />
+      ) : null}
+
+      {deadline ? (
+        <UrgencyGradient deadline={deadline} createdAt={initialTask.createdAt}>
+          {stepCard}
+        </UrgencyGradient>
+      ) : (
+        stepCard
       )}
 
-      <StepCard
-        content={currentStep!.content}
-        stepNumber={completedCount + 1}
-        total={steps.length}
-        onComplete={handleStepComplete}
-        isCompleting={isCompleting}
-      />
-
-      {userSettings?.enableEveningMode && !eveningDismissed && (
+      {userSettings?.enableEveningMode && !eveningDismissed ? (
         <EveningModeOverlay
           cutoffHour={userSettings.eveningCutoffHour}
           cutoffMin={userSettings.eveningCutoffMin}
           onDismiss={handleEveningDismiss}
         />
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface EveningModeOverlayProps {
@@ -11,6 +11,16 @@ interface EveningModeOverlayProps {
 
 const SNOOZE_KEY = "evening-mode-snoozed-until";
 const SNOOZE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+const POLL_INTERVAL_MS = 60_000;
+
+function isSnoozed(): boolean {
+  try {
+    const snoozedUntil = localStorage.getItem(SNOOZE_KEY);
+    return snoozedUntil !== null && Date.now() < parseInt(snoozedUntil, 10);
+  } catch {
+    return false;
+  }
+}
 
 function isPastCutoffTime(cutoffHour: number, cutoffMin: number): boolean {
   const now = new Date();
@@ -18,9 +28,7 @@ function isPastCutoffTime(cutoffHour: number, cutoffMin: number): boolean {
   const cutoffMinutes = cutoffHour * 60 + cutoffMin;
 
   if (currentMinutes < cutoffMinutes) return false;
-
-  const snoozedUntil = localStorage.getItem(SNOOZE_KEY);
-  if (snoozedUntil && Date.now() < parseInt(snoozedUntil, 10)) return false;
+  if (isSnoozed()) return false;
 
   return true;
 }
@@ -29,34 +37,44 @@ export default function EveningModeOverlay({
   cutoffHour,
   cutoffMin,
   onDismiss,
-}: EveningModeOverlayProps) {
+}: EveningModeOverlayProps): React.ReactElement | null {
   const router = useRouter();
-  const [isPastCutoff, setIsPastCutoff] = useState(() =>
-    isPastCutoffTime(cutoffHour, cutoffMin)
-  );
+  const [isPastCutoff, setIsPastCutoff] = useState(false);
 
   useEffect(() => {
-    if (isPastCutoff) return; // Already triggered, no need to poll
+    setIsPastCutoff(isPastCutoffTime(cutoffHour, cutoffMin));
+  }, [cutoffHour, cutoffMin]);
+
+  useEffect(() => {
+    if (isPastCutoff) return;
+
     const interval = setInterval(() => {
       setIsPastCutoff(isPastCutoffTime(cutoffHour, cutoffMin));
-    }, 60000);
+    }, POLL_INTERVAL_MS);
+
     return () => clearInterval(interval);
   }, [cutoffHour, cutoffMin, isPastCutoff]);
 
-  function handleSnooze() {
-    localStorage.setItem(SNOOZE_KEY, String(Date.now() + SNOOZE_DURATION_MS));
+  function handleSnooze(): void {
+    try {
+      localStorage.setItem(
+        SNOOZE_KEY,
+        String(Date.now() + SNOOZE_DURATION_MS),
+      );
+    } catch {
+      // localStorage unavailable -- snooze is best-effort
+    }
     setIsPastCutoff(false);
     onDismiss();
   }
 
-  function handleWindDown() {
+  function handleWindDown(): void {
     router.push("/");
   }
 
   if (!isPastCutoff) return null;
 
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], {
+  const timeStr = new Date().toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
   });

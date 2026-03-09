@@ -11,6 +11,39 @@ interface SettingsPanelProps {
   };
 }
 
+interface ToggleSwitchProps {
+  label: string;
+  description: string;
+  checked: boolean;
+  onToggle: () => void;
+}
+
+function ToggleSwitch({ label, description, checked, onToggle }: ToggleSwitchProps) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-stone-700 font-medium">{label}</p>
+        <p className="text-stone-400 text-sm">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={onToggle}
+        className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
+          checked ? "bg-amber-500" : "bg-stone-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            checked ? "translate-x-5" : "translate-x-0"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export default function SettingsPanel({ settings: initial }: SettingsPanelProps) {
   const [enableEveningMode, setEnableEveningMode] = useState(initial.enableEveningMode);
   const [enableFocusTimer, setEnableFocusTimer] = useState(initial.enableFocusTimer);
@@ -18,6 +51,14 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
   const [cutoffMin, setCutoffMin] = useState(initial.eveningCutoffMin);
   const [isSaving, setIsSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ message: string; isError: boolean } | null>(null);
+
+  function handleToggleFocusTimer() {
+    setEnableFocusTimer((prev) => !prev);
+  }
+
+  function handleToggleEveningMode() {
+    setEnableEveningMode((prev) => !prev);
+  }
 
   async function handleSave() {
     setIsSaving(true);
@@ -49,58 +90,21 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
       <h1 className="text-2xl font-semibold text-stone-800 mb-8">Settings</h1>
 
       <div className="bg-white border border-stone-200 rounded-2xl p-6 space-y-6">
-        {/* Focus Timer Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-stone-700 font-medium">Focus timer</p>
-            <p className="text-stone-400 text-sm">
-              Set a time limit before starting tasks
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enableFocusTimer}
-            onClick={() => setEnableFocusTimer(!enableFocusTimer)}
-            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-              enableFocusTimer ? "bg-amber-500" : "bg-stone-300"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                enableFocusTimer ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
-        </div>
+        <ToggleSwitch
+          label="Focus timer"
+          description="Set a time limit before starting tasks"
+          checked={enableFocusTimer}
+          onToggle={handleToggleFocusTimer}
+        />
 
-        {/* Evening Mode Toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-stone-700 font-medium">Evening mode</p>
-            <p className="text-stone-400 text-sm">
-              Gentle reminder to stop working and protect your sleep
-            </p>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={enableEveningMode}
-            onClick={() => setEnableEveningMode(!enableEveningMode)}
-            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
-              enableEveningMode ? "bg-amber-500" : "bg-stone-300"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                enableEveningMode ? "translate-x-5" : "translate-x-0"
-              }`}
-            />
-          </button>
-        </div>
+        <ToggleSwitch
+          label="Evening mode"
+          description="Gentle reminder to stop working and protect your sleep"
+          checked={enableEveningMode}
+          onToggle={handleToggleEveningMode}
+        />
 
-        {/* Evening Cutoff Time */}
-        {enableEveningMode && (
+        {enableEveningMode ? (
           <div>
             <p className="text-stone-700 font-medium mb-2">Evening cutoff time</p>
             <div className="flex items-center gap-2">
@@ -139,9 +143,8 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
               </select>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* Save Button */}
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -154,7 +157,7 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
           >
             {isSaving ? "Saving..." : "Save"}
           </button>
-          {saveResult && (
+          {saveResult ? (
             <p
               className={`text-sm ${
                 saveResult.isError ? "text-red-500" : "text-emerald-600"
@@ -162,7 +165,7 @@ export default function SettingsPanel({ settings: initial }: SettingsPanelProps)
             >
               {saveResult.message}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/api-helpers";
+import { requireSession, parseBody } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
 
 const SETTINGS_SELECT = {
@@ -10,7 +10,14 @@ const SETTINGS_SELECT = {
   enableFocusTimer: true,
 } as const;
 
-export async function GET() {
+const DEFAULT_SETTINGS = {
+  eveningCutoffHour: 23,
+  eveningCutoffMin: 0,
+  enableEveningMode: false,
+  enableFocusTimer: true,
+} as const;
+
+export async function GET(): Promise<NextResponse> {
   try {
     const auth = await requireSession();
     if (auth.error) return auth.error;
@@ -20,12 +27,7 @@ export async function GET() {
       select: SETTINGS_SELECT,
     });
 
-    return NextResponse.json(settings ?? {
-      eveningCutoffHour: 23,
-      eveningCutoffMin: 0,
-      enableEveningMode: false,
-      enableFocusTimer: true,
-    });
+    return NextResponse.json(settings ?? DEFAULT_SETTINGS);
   } catch (err) {
     logger.error({ err, route: "GET /api/user/settings" }, "Failed to fetch settings");
     return NextResponse.json(
@@ -35,15 +37,15 @@ export async function GET() {
   }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH(request: Request): Promise<NextResponse> {
   try {
     const [auth, body] = await Promise.all([
       requireSession(),
-      request.json().catch(() => null),
+      parseBody(request),
     ]);
     if (auth.error) return auth.error;
 
-    if (!body || typeof body !== "object") {
+    if (!body) {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
 

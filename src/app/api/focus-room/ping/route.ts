@@ -1,23 +1,22 @@
 import { NextResponse, after } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { parseBody, requireSession } from "@/lib/api-helpers";
+import { PRESENCE_TIMEOUT_MS } from "@/lib/focus-room";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
-export async function POST(request: Request) {
+const STALE_CLEANUP_MS = 5 * 60 * 1000;
+
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const [session, body] = await Promise.all([
-      auth(),
-      request.json().catch(() => ({})),
+    const [auth, body] = await Promise.all([
+      requireSession(),
+      parseBody(request),
     ]);
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (auth.error) return auth.error;
 
-    const { presenceId, stepContent } = body as {
-      presenceId?: string;
-      stepContent?: string;
-    };
+    const presenceId = (body as Record<string, unknown> | null)?.presenceId as string | undefined;
+    const stepContent = (body as Record<string, unknown> | null)?.stepContent as string | undefined;
 
     if (!presenceId) {
       return NextResponse.json(
@@ -28,20 +27,20 @@ export async function POST(request: Request) {
 
     // Update caller's lastPingAt and stepContent
     await prisma.focusRoomPresence.updateMany({
-      where: { id: presenceId, userId: session.user.id },
+      where: { id: presenceId, userId: auth.userId },
       data: {
         lastPingAt: new Date(),
         stepContent: stepContent ? stepContent.slice(0, 50) : null,
       },
     });
 
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000);
+    const twoMinAgo = new Date(Date.now() - PRESENCE_TIMEOUT_MS);
 
     // Get active users excluding caller
     const activeUsers = await prisma.focusRoomPresence.findMany({
       where: {
         lastPingAt: { gt: twoMinAgo },
-        userId: { not: session.user.id },
+        userId: { not: auth.userId },
       },
       select: {
         avatarSeed: true,
@@ -52,12 +51,16 @@ export async function POST(request: Request) {
 
     const totalActive = activeUsers.length + 1; // +1 for caller
 
-    // Clean up stale records in after() — non-blocking
+    // Clean up stale records after the response is sent
     after(async () => {
-      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-      await prisma.focusRoomPresence.deleteMany({
-        where: { lastPingAt: { lt: fiveMinAgo } },
-      });
+      try {
+        const fiveMinAgo = new Date(Date.now() - STALE_CLEANUP_MS);
+        await prisma.focusRoomPresence.deleteMany({
+          where: { lastPingAt: { lt: fiveMinAgo } },
+        });
+      } catch (err) {
+        logger.error({ err, route: "after /api/focus-room/ping" }, "Failed to clean up stale presence records");
+      }
     });
 
     return NextResponse.json({

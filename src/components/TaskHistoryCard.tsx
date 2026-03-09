@@ -34,7 +34,7 @@ export default function TaskHistoryCard({
           <div className="flex-1 min-w-0">
             <h3 className="font-medium text-stone-800 truncate">{title}</h3>
             <p className="text-sm text-stone-400 mt-1">
-              {stepCount} steps {dateStr && `\u00B7 ${dateStr}`}
+              {stepCount} steps{dateStr ? ` \u00B7 ${dateStr}` : ""}
             </p>
           </div>
           <span

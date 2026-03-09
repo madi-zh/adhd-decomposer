@@ -19,3 +19,11 @@ export async function findOwnedTask(taskId: string, userId: string) {
     where: { id: taskId, userId },
   });
 }
+
+export async function parseBody(request: Request): Promise<Record<string, unknown> | null> {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return null;
+  }
+  return body as Record<string, unknown>;
+}

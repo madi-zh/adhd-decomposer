@@ -1,8 +1,11 @@
 import crypto from "crypto";
-import { prisma } from "@/lib/prisma";
-import { sendPasswordResetEmail } from "@/lib/email";
+
 import { NextResponse, after } from "next/server";
+
+import { sendPasswordResetEmail } from "@/lib/email";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
+import { normalizeEmail } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
@@ -12,26 +15,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = normalizeEmail(email);
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
 
-    // Always return success to prevent email enumeration
     if (!user) {
       return NextResponse.json({ success: true });
     }
 
-    // Delete any existing tokens for this email
     await prisma.verificationToken.deleteMany({
       where: { identifier: normalizedEmail },
     });
 
-    // Generate token and its hash
     const token = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    // Store hashed token with 1-hour expiry
     await prisma.verificationToken.create({
       data: {
         identifier: normalizedEmail,
@@ -40,7 +39,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // Send email after response is returned (non-blocking)
     after(async () => {
       await sendPasswordResetEmail(normalizedEmail, token);
     });

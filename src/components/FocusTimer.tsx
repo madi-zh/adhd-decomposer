@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 interface FocusTimerProps {
@@ -40,7 +40,7 @@ export default function FocusTimer({
   startedAt,
 }: FocusTimerProps) {
   const router = useRouter();
-  const limitSeconds = useMemo(() => timeLimitMin * 60, [timeLimitMin]);
+  const limitSeconds = timeLimitMin * 60;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const chimeFiredRef = useRef(false);
   const nudgedLevelsRef = useRef<Set<number>>(new Set());
@@ -225,6 +225,12 @@ export default function FocusTimer({
   );
 }
 
+function getTimerStyle(nudgeLevel: number): string {
+  if (nudgeLevel >= 2) return "text-amber-700 font-medium text-sm";
+  if (nudgeLevel >= 1) return "text-amber-600 font-medium text-sm";
+  return "text-stone-400 text-sm";
+}
+
 function TimerDisplay({
   elapsedSeconds,
   nudgeLevel,
@@ -232,15 +238,8 @@ function TimerDisplay({
   elapsedSeconds: number;
   nudgeLevel: number;
 }) {
-  const style =
-    nudgeLevel >= 2
-      ? "text-amber-700 font-medium text-sm"
-      : nudgeLevel >= 1
-        ? "text-amber-600 font-medium text-sm"
-        : "text-stone-400 text-sm";
-
   return (
-    <p className={`${style} text-center`}>
+    <p className={`${getTimerStyle(nudgeLevel)} text-center`}>
       {formatTime(elapsedSeconds)} elapsed
     </p>
   );

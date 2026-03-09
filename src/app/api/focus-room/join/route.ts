@@ -1,42 +1,41 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { generateAvatarSeed } from "@/lib/focus-room";
+import { parseBody, requireSession } from "@/lib/api-helpers";
+import { generateAvatarSeed, PRESENCE_TIMEOUT_MS } from "@/lib/focus-room";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const [session, body] = await Promise.all([
-      auth(),
-      request.json().catch(() => ({})),
+    const [auth, body] = await Promise.all([
+      requireSession(),
+      parseBody(request),
     ]);
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (auth.error) return auth.error;
 
-    const { taskId } = body as { taskId?: string };
+    const taskId = (body as Record<string, unknown> | null)?.taskId as string | undefined;
 
-    // Delete any stale presence for this user first
+    // Delete any stale presence for this user, then create fresh entry
     await prisma.focusRoomPresence.deleteMany({
-      where: { userId: session.user.id },
+      where: { userId: auth.userId },
     });
 
-    const avatarSeed = generateAvatarSeed(session.user.id);
+    const avatarSeed = generateAvatarSeed(auth.userId);
 
-    const presence = await prisma.focusRoomPresence.create({
-      data: {
-        userId: session.user.id,
-        taskId: taskId || null,
-        avatarSeed,
-      },
-    });
-
-    const activeCount = await prisma.focusRoomPresence.count({
-      where: {
-        lastPingAt: { gt: new Date(Date.now() - 2 * 60 * 1000) },
-      },
-    });
+    const [presence, activeCount] = await Promise.all([
+      prisma.focusRoomPresence.create({
+        data: {
+          userId: auth.userId,
+          taskId: taskId || null,
+          avatarSeed,
+        },
+      }),
+      prisma.focusRoomPresence.count({
+        where: {
+          lastPingAt: { gt: new Date(Date.now() - PRESENCE_TIMEOUT_MS) },
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       presenceId: presence.id,

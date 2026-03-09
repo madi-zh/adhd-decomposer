@@ -1,21 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireSession, findOwnedTask, parseBody } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
-import { VALID_MOOD_KEYS } from "@/lib/moods";
-import { requireSession, findOwnedTask } from "@/lib/api-helpers";
+import { VALID_MOOD_KEY_SET } from "@/lib/moods";
 
-const VALID_TIMINGS = ["before", "after"];
+const VALID_TIMINGS = ["before", "after"] as const;
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const [auth, body] = await Promise.all([
       requireSession(),
-      request.json().catch(() => null),
+      parseBody(request),
     ]);
-
     if (auth.error) return auth.error;
 
-    if (!body || typeof body !== "object" || Array.isArray(body)) {
+    if (!body) {
       return NextResponse.json(
         { error: "Invalid request body." },
         { status: 400 }
@@ -31,14 +30,14 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!VALID_MOOD_KEYS.includes(mood)) {
+    if (!VALID_MOOD_KEY_SET.has(mood as string)) {
       return NextResponse.json(
         { error: "Invalid mood value." },
         { status: 400 }
       );
     }
 
-    if (!VALID_TIMINGS.includes(timing)) {
+    if (!VALID_TIMINGS.includes(timing as typeof VALID_TIMINGS[number])) {
       return NextResponse.json(
         { error: "Invalid timing value." },
         { status: 400 }
@@ -52,14 +51,14 @@ export async function POST(request: Request) {
 
     const checkIn = await prisma.moodCheckIn.upsert({
       where: {
-        taskId_userId_timing: { taskId, userId: auth.userId, timing },
+        taskId_userId_timing: { taskId, userId: auth.userId, timing: timing as string },
       },
-      update: { mood },
+      update: { mood: mood as string },
       create: {
         taskId,
         userId: auth.userId,
-        mood,
-        timing,
+        mood: mood as string,
+        timing: timing as string,
       },
     });
 

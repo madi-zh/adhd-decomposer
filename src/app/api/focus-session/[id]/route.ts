@@ -1,35 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/api-helpers";
+import { requireSession, parseBody } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+): Promise<NextResponse> {
   try {
     const [auth, { id }, body] = await Promise.all([
       requireSession(),
       params,
-      request.json().catch(() => null),
+      parseBody(request),
     ]);
     if (auth.error) return auth.error;
 
-    if (!body || typeof body !== "object") {
+    if (!body) {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
 
     const { action } = body;
 
     if (action === "end") {
+      const endedAt = new Date();
       const updated = await prisma.focusSession.updateMany({
         where: { id, userId: auth.userId },
-        data: { endedAt: new Date() },
+        data: { endedAt },
       });
       if (updated.count === 0) {
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
       }
-      return NextResponse.json({ id, endedAt: new Date() });
+      return NextResponse.json({ id, endedAt });
     }
 
     if (action === "nudge") {

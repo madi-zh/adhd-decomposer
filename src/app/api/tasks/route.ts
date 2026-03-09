@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
+import { requireSession } from "@/lib/api-helpers";
 import { decomposeTask } from "@/lib/claude";
-import { auth } from "@/lib/auth";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const [session, body] = await Promise.all([
-      auth(),
+    const [auth, body] = await Promise.all([
+      requireSession(),
       request.json().catch(() => null),
     ]);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    if (auth.error) return auth.error;
 
     if (!body) {
       return NextResponse.json(
@@ -32,14 +30,13 @@ export async function POST(request: Request) {
     }
 
     const trimmed = input.trim();
-
     const result = await decomposeTask(trimmed);
 
     const task = await prisma.task.create({
       data: {
         title: result.title,
         rawInput: trimmed,
-        userId: session.user.id,
+        userId: auth.userId,
         steps: {
           create: result.steps.map((content, index) => ({
             content,
@@ -62,13 +59,11 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (auth.error) return auth.error;
 
     const tasks = await prisma.task.findMany({
-      where: { userId: session.user.id },
+      where: { userId: auth.userId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

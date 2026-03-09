@@ -1,18 +1,17 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-helpers";
+import { PRESENCE_TIMEOUT_MS } from "@/lib/focus-room";
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = await requireSession();
+    if (auth.error) return auth.error;
 
     const activeCount = await prisma.focusRoomPresence.count({
       where: {
-        lastPingAt: { gt: new Date(Date.now() - 2 * 60 * 1000) },
+        lastPingAt: { gt: new Date(Date.now() - PRESENCE_TIMEOUT_MS) },
       },
     });
 

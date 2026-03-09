@@ -1,9 +1,11 @@
 import crypto from "crypto";
+
 import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { NextResponse } from "next/server";
+
 import { logger } from "@/lib/logger";
+import { prisma } from "@/lib/prisma";
+import { BCRYPT_SALT_ROUNDS, MIN_PASSWORD_LENGTH, normalizeEmail } from "@/lib/validation";
 
 export async function POST(request: Request) {
   try {
@@ -27,13 +29,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = normalizeEmail(email);
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    // Start bcrypt early, await inside transaction after token lookup
-    const hashedPasswordPromise = bcrypt.hash(password, 12);
+    const hashedPasswordPromise = bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
-    // Use a transaction to atomically validate the token and update the password
     const result = await prisma.$transaction(async (tx) => {
       const verificationToken = await tx.verificationToken.findFirst({
         where: {
@@ -46,7 +46,6 @@ export async function POST(request: Request) {
         return { error: "Invalid or expired reset link" } as const;
       }
 
-      // Check expiry before deleting so error messages stay consistent
       if (verificationToken.expires < new Date()) {
         await tx.verificationToken.delete({
           where: {
@@ -59,21 +58,22 @@ export async function POST(request: Request) {
         return { error: "Reset link has expired. Please request a new one." } as const;
       }
 
-      // Delete the token to prevent reuse
-      await tx.verificationToken.delete({
-        where: {
-          identifier_token: {
-            identifier: normalizedEmail,
-            token: hashedToken,
-          },
-        },
-      });
-
       const hashedPassword = await hashedPasswordPromise;
-      await tx.user.update({
-        where: { email: normalizedEmail },
-        data: { hashedPassword },
-      });
+
+      await Promise.all([
+        tx.verificationToken.delete({
+          where: {
+            identifier_token: {
+              identifier: normalizedEmail,
+              token: hashedToken,
+            },
+          },
+        }),
+        tx.user.update({
+          where: { email: normalizedEmail },
+          data: { hashedPassword },
+        }),
+      ]);
 
       return { success: true } as const;
     });

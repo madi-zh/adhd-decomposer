@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { getActiveTheme } from "@/lib/xp";
 import TaskStepController from "@/components/TaskStepController";
 
 async function getActiveFocusCount() {
@@ -20,40 +21,47 @@ export default async function TaskPage({
     redirect("/login");
   }
 
-  const [task, userSettings, activeFocusSession, focusCount] = await Promise.all([
-    prisma.task.findUnique({
-      where: { id, userId: session.user.id },
-      include: {
-        steps: { orderBy: { orderIndex: "asc" } },
-        timeEstimate: true,
-        moodCheckIns: {
-          select: { mood: true, timing: true },
-          orderBy: { createdAt: "asc" },
+  const [task, streak, userSettings, activeFocusSession, focusCount] =
+    await Promise.all([
+      prisma.task.findUnique({
+        where: { id, userId: session.user.id },
+        include: {
+          steps: { orderBy: { orderIndex: "asc" } },
+          timeEstimate: true,
+          moodCheckIns: {
+            select: { mood: true, timing: true },
+            orderBy: { createdAt: "asc" },
+          },
         },
-      },
-    }),
-    prisma.userSettings.findUnique({
-      where: { userId: session.user.id },
-      select: {
-        eveningCutoffHour: true,
-        eveningCutoffMin: true,
-        enableEveningMode: true,
-        enableFocusTimer: true,
-      },
-    }),
-    prisma.focusSession.findFirst({
-      where: { taskId: id, userId: session.user.id, endedAt: null },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, timeLimitMin: true, startedAt: true },
-    }),
-    getActiveFocusCount(),
-  ]);
+      }),
+      prisma.userStreak.findUnique({
+        where: { userId: session.user.id },
+        select: { totalXp: true },
+      }),
+      prisma.userSettings.findUnique({
+        where: { userId: session.user.id },
+        select: {
+          eveningCutoffHour: true,
+          eveningCutoffMin: true,
+          enableEveningMode: true,
+          enableFocusTimer: true,
+        },
+      }),
+      prisma.focusSession.findFirst({
+        where: { taskId: id, userId: session.user.id, endedAt: null },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, timeLimitMin: true, startedAt: true },
+      }),
+      getActiveFocusCount(),
+    ]);
 
   if (!task) {
     notFound();
   }
 
-  const timeEstimate = task.timeEstimate
+  const { colors: confettiColors } = getActiveTheme(streak?.totalXp ?? 0);
+
+  const serializedTimeEstimate = task.timeEstimate
     ? {
         estimateMinutes: task.timeEstimate.estimateMinutes,
         startedAt: task.timeEstimate.startedAt.toISOString(),
@@ -62,11 +70,23 @@ export default async function TaskPage({
       }
     : null;
 
+  const serializedFocusSession = activeFocusSession
+    ? {
+        id: activeFocusSession.id,
+        timeLimitMin: activeFocusSession.timeLimitMin,
+        startedAt: activeFocusSession.startedAt.toISOString(),
+      }
+    : null;
+
   return (
     <TaskStepController
       task={{
         id: task.id,
         title: task.title,
+        createdAt: task.createdAt.toISOString(),
+        deadline: task.deadline?.toISOString() ?? null,
+        confettiColors,
+        xpAwarded: task.xpAwarded,
         steps: task.steps.map((s) => ({
           id: s.id,
           content: s.content,
@@ -77,18 +97,10 @@ export default async function TaskPage({
           timing: m.timing,
         })),
       }}
-      timeEstimate={timeEstimate}
+      timeEstimate={serializedTimeEstimate}
       initialFocusCount={focusCount}
       userSettings={userSettings ?? undefined}
-      focusSession={
-        activeFocusSession
-          ? {
-              id: activeFocusSession.id,
-              timeLimitMin: activeFocusSession.timeLimitMin,
-              startedAt: activeFocusSession.startedAt.toISOString(),
-            }
-          : null
-      }
+      focusSession={serializedFocusSession}
     />
   );
 }

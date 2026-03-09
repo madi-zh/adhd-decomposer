@@ -77,9 +77,9 @@ export default function TaskInput() {
           autoFocus
         />
 
-        {error && (
+        {error ? (
           <ErrorAlert id="task-error" message={error} className="mt-2 text-center" />
-        )}
+        ) : null}
 
         <button
           type="submit"

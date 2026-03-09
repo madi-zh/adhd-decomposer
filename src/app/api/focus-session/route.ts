@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, findOwnedTask } from "@/lib/api-helpers";
+import { requireSession, findOwnedTask, parseBody } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse> {
   try {
     const [auth, body] = await Promise.all([
       requireSession(),
-      request.json().catch(() => null),
+      parseBody(request),
     ]);
     if (auth.error) return auth.error;
 
-    if (!body || typeof body !== "object") {
+    if (!body) {
       return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
     }
 

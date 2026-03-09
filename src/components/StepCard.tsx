@@ -26,6 +26,7 @@ export default function StepCard({
       </div>
 
       <button
+        type="button"
         onClick={onComplete}
         disabled={isCompleting}
         aria-label={`Mark step ${stepNumber} of ${total} as done`}

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
+import { findOwnedTask, requireSession } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
-import { requireSession, findOwnedTask } from "@/lib/api-helpers";
-import { MIN_ESTIMATE_MINUTES, MAX_ESTIMATE_MINUTES } from "@/lib/validation";
+import { prisma } from "@/lib/prisma";
+import { MAX_ESTIMATE_MINUTES, MIN_ESTIMATE_MINUTES } from "@/lib/validation";
 
 export async function POST(
   request: Request,
@@ -21,7 +22,7 @@ export async function POST(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const estimateMinutes = body.estimateMinutes;
+    const { estimateMinutes } = body;
     if (
       typeof estimateMinutes !== "number" ||
       !Number.isInteger(estimateMinutes) ||

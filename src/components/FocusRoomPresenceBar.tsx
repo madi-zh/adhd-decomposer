@@ -49,11 +49,10 @@ export default function FocusRoomPresenceBar({
       }
     }
 
-    const initialTimeout = setTimeout(doPing, 0);
+    doPing();
     const interval = setInterval(doPing, 30000);
     return () => {
       active = false;
-      clearTimeout(initialTimeout);
       clearInterval(interval);
     };
   }, [presenceId]);
@@ -94,11 +93,11 @@ export default function FocusRoomPresenceBar({
         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
       </span>
 
-      {visibleUsers.length > 0 && (
+      {visibleUsers.length > 0 ? (
         <div className="flex -space-x-2">
-          {visibleUsers.map((user, i) => (
+          {visibleUsers.map((user) => (
             <div
-              key={i}
+              key={user.avatarSeed}
               className="w-6 h-6 rounded-full border-2 border-white relative group"
               style={{ backgroundColor: seedToColor(user.avatarSeed) }}
             >
@@ -107,13 +106,13 @@ export default function FocusRoomPresenceBar({
               </div>
             </div>
           ))}
-          {hiddenCount > 0 && (
+          {hiddenCount > 0 ? (
             <div className="w-6 h-6 rounded-full border-2 border-white bg-emerald-200 flex items-center justify-center text-[10px] text-emerald-700 font-medium">
               +{hiddenCount}
             </div>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       <span className="text-sm text-emerald-700 font-medium">
         {totalActive} {totalActive === 1 ? "person" : "people"} focusing

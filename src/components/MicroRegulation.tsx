@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { type DistressedMood } from "@/lib/moods";
 
@@ -10,13 +10,49 @@ interface MicroRegulationProps {
   onSkip: () => void;
 }
 
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeToReducedMotion(callback: () => void): () => void {
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+
+function getReducedMotionSnapshot(): boolean {
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+function getReducedMotionServerSnapshot(): boolean {
+  return false;
+}
+
 // --- Box Breathing (anxious) ---
 
-const BREATHING_PHASES = ["Breathe in...", "Hold...", "Breathe out...", "Hold..."] as const;
+const BREATHING_PHASES = [
+  "Breathe in...",
+  "Hold...",
+  "Breathe out...",
+  "Hold...",
+] as const;
 
-function BoxBreathing({ onComplete }: { onComplete: () => void }) {
+function BoxBreathing({
+  onComplete,
+}: {
+  onComplete: () => void;
+}): React.ReactElement {
   const [phaseIndex, setPhaseIndex] = useState(0);
+  const onCompleteRef = useRef(onComplete);
   const completed = useRef(false);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  const prefersReducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotionSnapshot,
+    getReducedMotionServerSnapshot,
+  );
 
   useEffect(() => {
     const phaseInterval = setInterval(() => {
@@ -26,7 +62,7 @@ function BoxBreathing({ onComplete }: { onComplete: () => void }) {
     const timeout = setTimeout(() => {
       if (!completed.current) {
         completed.current = true;
-        onComplete();
+        onCompleteRef.current();
       }
     }, 30000);
 
@@ -34,20 +70,17 @@ function BoxBreathing({ onComplete }: { onComplete: () => void }) {
       clearInterval(phaseInterval);
       clearTimeout(timeout);
     };
-  }, [onComplete]);
+  }, []);
 
   const isExpanded = phaseIndex === 0 || phaseIndex === 1;
-  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const circleClass = prefersReducedMotion
+    ? `w-32 h-32 rounded-full border-4 border-amber-400 ${isExpanded ? "bg-amber-100" : "bg-white"}`
+    : `w-32 h-32 rounded-full border-4 border-amber-400 transition-all duration-[4000ms] ${isExpanded ? "scale-125 bg-amber-100" : "scale-100 bg-white"}`;
 
   return (
     <>
-      <div
-        className={`w-32 h-32 rounded-full border-4 border-amber-400 ${
-          prefersReducedMotion
-            ? (isExpanded ? "bg-amber-100" : "bg-white")
-            : `transition-all duration-[4000ms] ${isExpanded ? "scale-125 bg-amber-100" : "scale-100 bg-white"}`
-        }`}
-      />
+      <div className={circleClass} />
       <p aria-live="polite" className="text-lg text-stone-600 mt-8">
         {BREATHING_PHASES[phaseIndex]}
       </p>
@@ -63,14 +96,25 @@ const REFRAME_CARDS = [
   "This feeling will pass.",
 ];
 
-function CbtReframe({ onComplete }: { onComplete: () => void }) {
+function CbtReframe({
+  onComplete,
+}: {
+  onComplete: () => void;
+}): React.ReactElement {
   const [cardIndex, setCardIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+  const onCompleteRef = useRef(onComplete);
   const innerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (cardIndex >= REFRAME_CARDS.length - 1) {
-      const timer = setTimeout(onComplete, 8000);
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    const isLastCard = cardIndex >= REFRAME_CARDS.length - 1;
+
+    if (isLastCard) {
+      const timer = setTimeout(() => onCompleteRef.current(), 8000);
       return () => clearTimeout(timer);
     }
 
@@ -81,11 +125,12 @@ function CbtReframe({ onComplete }: { onComplete: () => void }) {
         setVisible(true);
       }, 500);
     }, 8000);
+
     return () => {
       clearTimeout(timer);
       if (innerTimer.current) clearTimeout(innerTimer.current);
     };
-  }, [cardIndex, onComplete]);
+  }, [cardIndex]);
 
   return (
     <div
@@ -109,12 +154,23 @@ const GROUNDING_PROMPTS = [
   "Name 1 thing you can taste",
 ];
 
-function Grounding({ onComplete }: { onComplete: () => void }) {
+function Grounding({
+  onComplete,
+}: {
+  onComplete: () => void;
+}): React.ReactElement {
   const [step, setStep] = useState(0);
+  const onCompleteRef = useRef(onComplete);
 
   useEffect(() => {
-    if (step >= GROUNDING_PROMPTS.length - 1) {
-      const timer = setTimeout(onComplete, 6000);
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    const isLastStep = step >= GROUNDING_PROMPTS.length - 1;
+
+    if (isLastStep) {
+      const timer = setTimeout(() => onCompleteRef.current(), 6000);
       return () => clearTimeout(timer);
     }
 
@@ -122,7 +178,7 @@ function Grounding({ onComplete }: { onComplete: () => void }) {
       setStep((prev) => prev + 1);
     }, 6000);
     return () => clearTimeout(timer);
-  }, [step, onComplete]);
+  }, [step]);
 
   return (
     <p aria-live="polite" className="text-xl font-medium text-stone-700">
@@ -133,16 +189,28 @@ function Grounding({ onComplete }: { onComplete: () => void }) {
 
 // --- Main Component ---
 
+function renderExercise(
+  mood: DistressedMood,
+  onComplete: () => void,
+): React.ReactElement {
+  switch (mood) {
+    case "anxious":
+      return <BoxBreathing onComplete={onComplete} />;
+    case "frustrated":
+      return <CbtReframe onComplete={onComplete} />;
+    case "tired":
+      return <Grounding onComplete={onComplete} />;
+  }
+}
+
 export default function MicroRegulation({
   mood,
   onComplete,
   onSkip,
-}: MicroRegulationProps) {
+}: MicroRegulationProps): React.ReactElement {
   return (
     <div className="flex flex-col items-center justify-center pt-12">
-      {mood === "anxious" && <BoxBreathing onComplete={onComplete} />}
-      {mood === "frustrated" && <CbtReframe onComplete={onComplete} />}
-      {mood === "tired" && <Grounding onComplete={onComplete} />}
+      {renderExercise(mood, onComplete)}
 
       <button
         onClick={onSkip}

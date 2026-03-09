@@ -100,7 +100,7 @@ export default function FocusContract({
         </button>
       </div>
 
-      {isCustom && (
+      {isCustom ? (
         <div className="mb-4">
           <label htmlFor="custom-minutes" className="sr-only">
             Minutes (5–180)
@@ -117,11 +117,11 @@ export default function FocusContract({
                        text-stone-700 focus:border-amber-400 focus:outline-none"
           />
         </div>
-      )}
+      ) : null}
 
-      {error && (
+      {error ? (
         <ErrorAlert message={error} className="text-center mb-4" />
-      )}
+      ) : null}
 
       <button
         type="button"

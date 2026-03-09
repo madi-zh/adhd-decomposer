@@ -8,17 +8,18 @@ datasource db {
 }
 
 model User {
-  id             String              @id @default(cuid())
-  name           String?
-  email          String              @unique
-  emailVerified  DateTime?
-  hashedPassword String?
-  image          String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  accounts       Account[]
-  sessions       Session[]
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String              @unique
+  emailVerified      DateTime?
+  hashedPassword     String?
+  image              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  accounts           Account[]
+  sessions           Session[]
   tasks              Task[]
+  streak             UserStreak?
   focusSessions      FocusSession[]
   focusRoomPresence  FocusRoomPresence[]
   moodCheckIns       MoodCheckIn[]
@@ -60,19 +61,32 @@ model VerificationToken {
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  title       String
-  rawInput    String
-  status      String    @default("active")
-  createdAt   DateTime  @default(now())
-  completedAt DateTime?
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                 String              @id @default(cuid())
+  title              String
+  rawInput           String
+  status             String              @default("active")
+  createdAt          DateTime            @default(now())
+  completedAt        DateTime?
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   steps              Step[]
+  deadline           DateTime?
+  xpAwarded          Int                 @default(0)
   focusSessions      FocusSession[]
   timeEstimate       TimeEstimate?
   focusRoomPresences FocusRoomPresence[]
   moodCheckIns       MoodCheckIn[]
+}
+
+model UserStreak {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  lastActiveDate String?
+  totalXp        Int      @default(0)
+  updatedAt      DateTime @updatedAt
 }
 
 model TimeEstimate {

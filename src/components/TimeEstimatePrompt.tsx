@@ -25,10 +25,6 @@ export default function TimeEstimatePrompt({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  function handleQuickPick(value: number) {
-    setMinutes(value);
-  }
-
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value;
     if (raw === "") {
@@ -85,7 +81,7 @@ export default function TimeEstimatePrompt({
             key={value}
             type="button"
             data-selected={minutes === value}
-            onClick={() => handleQuickPick(value)}
+            onClick={() => setMinutes(value)}
             className="px-4 py-2 border-2 border-stone-200 rounded-2xl text-stone-600 hover:border-amber-400 data-[selected=true]:border-amber-500 data-[selected=true]:bg-amber-50 transition-colors"
           >
             {value} min
@@ -105,9 +101,9 @@ export default function TimeEstimatePrompt({
         />
       </div>
 
-      {error && (
+      {error ? (
         <ErrorAlert message={error} className="mb-4" />
-      )}
+      ) : null}
 
       <button
         type="button"
